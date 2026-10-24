@@ -1,0 +1,54 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  handheld-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: 檢查手持機程式語法
+        run: |
+          node --check handheld/web/logic.js
+          node --check handheld/web/app.js
+          node --check handheld/web/receipt.js
+          node --check handheld/web/native.js
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+      - name: 編譯 APK
+        env:
+          APP_VERSION_CODE: ${{ github.run_number }}
+          APP_VERSION_NAME: "0.4.0"
+        run: gradle -p handheld/android :app:assembleRelease --no-daemon --stacktrace
+      - name: 整理檔名
+        run: cp handheld/android/app/build/outputs/apk/release/app-release.apk hongsheng-handheld-0.4.0.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hongsheng-handheld-apk
+          path: hongsheng-handheld-0.4.0.apk
+
+  windows-exe:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: 核心測試
+        run: cargo test -p shipping_core
+      - name: 編譯 exe
+        run: cargo build --release -p hongsheng-shipping --features tauri/custom-protocol
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hongsheng-shipping-exe
+          path: target/release/hongsheng-shipping.exe

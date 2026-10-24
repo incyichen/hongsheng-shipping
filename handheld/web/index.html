@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>泓昇出貨</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+
+<!-- 連線到電腦（第一次使用） -->
+<section class="view" id="v-setup">
+  <header class="bar"><h1>連線到電腦</h1></header>
+  <div class="page">
+    <p class="lead">在電腦的出貨系統按「設定 → 手持機同步 → 新增手持機」，把畫面上的位址和配對碼輸入這裡。</p>
+    <label class="field"><span>電腦位址</span><input id="su-server" inputmode="url" autocomplete="off" placeholder="例如 100.101.102.103"></label>
+    <label class="field"><span>配對碼（6 位數）</span><input id="su-code" inputmode="numeric" maxlength="6" autocomplete="off" class="big-num"></label>
+    <label class="field"><span>這台手持機的名稱</span><input id="su-name" autocomplete="off"></label>
+    <p class="error" id="su-error"></p>
+    <button type="button" class="btn primary block" id="su-pair">配對並下載資料</button>
+  </div>
+</section>
+
+<!-- 首頁：單據清單 -->
+<section class="view" id="v-home">
+  <header class="bar">
+    <h1 id="home-title">出貨單</h1>
+    <button type="button" class="bar-btn" id="home-settings" aria-label="設定">設定</button>
+  </header>
+  <button type="button" class="sync-chip" id="sync-chip"></button>
+  <div class="page with-fab" id="home-list"></div>
+  <button type="button" class="fab" id="home-new">＋ 開新出貨單</button>
+</section>
+
+<!-- 開單／編輯 -->
+<section class="view" id="v-doc">
+  <header class="bar">
+    <button type="button" class="bar-back" data-back aria-label="返回">‹</button>
+    <h1 id="doc-title">新出貨單</h1>
+    <button type="button" class="bar-btn danger" id="doc-delete" hidden>刪除</button>
+  </header>
+  <div class="page with-actions">
+    <div id="doc-banner"></div>
+    <button type="button" class="pick" id="doc-customer"></button>
+    <div id="doc-lines"></div>
+    <button type="button" class="btn ghost block" id="doc-add">＋ 加品項</button>
+    <div class="totals" id="doc-totals"></div>
+  </div>
+  <div class="actions-bar" id="doc-actions"></div>
+</section>
+
+<!-- 選客戶 -->
+<section class="view" id="v-customers">
+  <header class="bar">
+    <button type="button" class="bar-back" data-back aria-label="返回">‹</button>
+    <h1>選擇客戶</h1>
+  </header>
+  <div class="search"><input id="cp-search" type="search" placeholder="搜尋名稱、代號、電話" autocomplete="off"></div>
+  <div class="page" id="cp-list"></div>
+</section>
+
+<!-- 新增客戶 -->
+<section class="view" id="v-newcust">
+  <header class="bar">
+    <button type="button" class="bar-back" data-back aria-label="返回">‹</button>
+    <h1>新增客戶</h1>
+  </header>
+  <div class="page with-actions">
+    <label class="field"><span>客戶名稱（印在單上）</span><input id="nc-name" autocomplete="off"></label>
+    <label class="field"><span>電話</span><input id="nc-phone" inputmode="tel" autocomplete="off"></label>
+    <label class="field"><span>地址</span><input id="nc-address" autocomplete="off"></label>
+    <div class="field"><span>稅別</span>
+      <div class="seg" id="nc-tax">
+        <button type="button" data-v="exclusive" aria-pressed="true">外加 5%</button>
+        <button type="button" data-v="inclusive" aria-pressed="false">內含 5%</button>
+        <button type="button" data-v="none" aria-pressed="false">免稅</button>
+      </div>
+    </div>
+    <label class="field"><span>備註</span><input id="nc-note" autocomplete="off"></label>
+    <p class="hint">新增的客戶會同步到電腦，在電腦上確認或合併。</p>
+  </div>
+  <div class="actions-bar"><button type="button" class="btn primary" id="nc-save">儲存並使用</button></div>
+</section>
+
+<!-- 選品項 -->
+<section class="view" id="v-products">
+  <header class="bar">
+    <button type="button" class="bar-back" data-back aria-label="返回">‹</button>
+    <h1>選擇品項</h1>
+  </header>
+  <div class="search"><input id="pp-search" type="search" placeholder="搜尋品名或代號，或直接輸入新品名" autocomplete="off"></div>
+  <div class="page" id="pp-list"></div>
+</section>
+
+<!-- 品項：數量、單價 -->
+<section class="view" id="v-item">
+  <header class="bar">
+    <button type="button" class="bar-back" data-back aria-label="返回">‹</button>
+    <h1 id="it-title">品項</h1>
+  </header>
+  <div class="page with-actions">
+    <label class="field"><span>品名</span><input id="it-name" autocomplete="off"></label>
+    <div class="field">
+      <span>數量</span>
+      <input id="it-qty" inputmode="decimal" autocomplete="off" class="big-num">
+      <div class="chips" id="it-qty-chips">
+        <button type="button" data-add="斤">斤</button><button type="button" data-add="兩">兩</button>
+        <button type="button" data-clear>清除</button>
+      </div>
+      <p class="hint" id="it-qty-hint"></p>
+    </div>
+    <div class="field">
+      <span>單位</span>
+      <input id="it-unit" autocomplete="off">
+      <div class="chips" id="it-unit-chips"></div>
+    </div>
+    <div class="field">
+      <span>單價</span>
+      <input id="it-price" inputmode="decimal" autocomplete="off" class="big-num">
+      <p class="hint" id="it-price-hint"></p>
+    </div>
+    <label class="field"><span>備註</span><input id="it-note" autocomplete="off"></label>
+    <div class="amount-preview" id="it-amount"></div>
+  </div>
+  <div class="actions-bar">
+    <button type="button" class="btn ghost danger" id="it-remove">刪除此項</button>
+    <button type="button" class="btn primary" id="it-ok">確定</button>
+  </div>
+</section>
+
+<!-- 熱感單預覽 -->
+<section class="view" id="v-receipt">
+  <header class="bar">
+    <button type="button" class="bar-back" data-back aria-label="返回">‹</button>
+    <h1>出貨單</h1>
+  </header>
+  <div class="page with-actions receipt-page">
+    <p class="status-line" id="rc-status"></p>
+    <img id="rc-image" alt="熱感單預覽">
+  </div>
+  <div class="actions-bar">
+    <button type="button" class="btn ghost" id="rc-print">再印一張</button>
+    <button type="button" class="btn primary" id="rc-done">完成</button>
+  </div>
+</section>
+
+<!-- 設定 -->
+<section class="view" id="v-settings">
+  <header class="bar">
+    <button type="button" class="bar-back" data-back aria-label="返回">‹</button>
+    <h1>設定</h1>
+  </header>
+  <div class="page">
+    <div class="card" id="st-conn"></div>
+    <label class="field"><span>製表人員（預設）</span><input id="st-maker" autocomplete="off"></label>
+    <div class="field"><span>印表機</span><div id="st-printers" class="stack"></div></div>
+    <button type="button" class="btn ghost block" id="st-test">列印測試單</button>
+    <button type="button" class="btn ghost block" id="st-sync">立即同步</button>
+    <button type="button" class="btn ghost block" id="st-repair">重新配對</button>
+    <button type="button" class="btn ghost danger block" id="st-reset">清除手持機上的資料</button>
+    <p class="hint" id="st-version"></p>
+  </div>
+</section>
+
+<div class="modal-back" id="confirm-back">
+  <div class="modal" role="dialog" aria-modal="true">
+    <p id="confirm-msg"></p>
+    <div class="modal-actions">
+      <button type="button" class="btn ghost" id="confirm-cancel">取消</button>
+      <button type="button" class="btn primary" id="confirm-ok">確定</button>
+    </div>
+  </div>
+</div>
+<div id="toast" aria-live="polite"></div>
+<canvas id="receipt-canvas" width="384" height="100" hidden></canvas>
+
+<script src="logic.js"></script>
+<script src="receipt.js"></script>
+<script src="native.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

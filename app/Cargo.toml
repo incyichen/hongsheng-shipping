@@ -1,0 +1,22 @@
+[package]
+name = "hongsheng-shipping"
+version = "0.4.0"
+edition = "2021"
+description = "泓昇海鮮 出貨對帳系統"
+
+[[bin]]
+name = "hongsheng-shipping"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+shipping_core = { path = "../core" }
+tauri = { version = "2", features = [] }
+tauri-plugin-single-instance = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+if-addrs = "0.13"

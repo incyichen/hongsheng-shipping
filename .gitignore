@@ -1,0 +1,8 @@
+/target/
+handheld/android/.gradle/
+handheld/android/build/
+handheld/android/app/build/
+handheld/android/local.properties
+*.db
+*.db-wal
+*.db-shm

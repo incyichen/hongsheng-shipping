@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>泓昇海鮮 出貨對帳系統</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav id="nav" aria-label="主選單">
+  <div class="brand" id="brand">泓昇海鮮</div>
+  <div class="brand-sub">出貨對帳系統</div>
+  <button type="button" data-view="ship" class="active">出貨單</button>
+  <button type="button" data-view="man">對帳單（手開）</button>
+  <button type="button" data-view="stmt">對帳單・收款</button>
+  <button type="button" data-view="prod">品項</button>
+  <button type="button" data-view="cust">客戶</button>
+  <button type="button" data-view="set">設定</button>
+  <div class="nav-foot" id="nav-foot"></div>
+</nav>
+
+<main id="main">
+  <!-- 出貨單：列表 -->
+  <section class="view active" id="view-ship-list">
+    <div class="head">
+      <h1>出貨單</h1>
+      <div class="actions">
+        <button type="button" class="btn" id="btn-new-adj">＋ 退貨／折讓</button>
+        <button type="button" class="btn primary" id="btn-new-ship">＋ 新增出貨單</button>
+      </div>
+    </div>
+    <div id="sync-banner"></div>
+    <div class="card pad">
+      <div class="fields">
+        <label class="f span2"><span class="lbl">客戶（空白＝全部）</span><input type="text" id="ship-f-cust" data-combo="customers" autocomplete="off" placeholder="輸入名稱或代號"></label>
+        <label class="f"><span class="lbl">月份</span><input type="month" id="ship-f-month"></label>
+      </div>
+    </div>
+    <div class="card"><div class="table-wrap" id="ship-list"></div></div>
+  </section>
+
+  <!-- 出貨單：編輯 -->
+  <section class="view" id="view-ship-edit"></section>
+
+  <!-- 手開對帳單：列表 -->
+  <section class="view" id="view-man">
+    <div class="head">
+      <h1>對帳單（手開）</h1>
+      <div class="actions">
+        <button type="button" class="btn primary" id="btn-new-man">＋ 新增對帳單</button>
+      </div>
+    </div>
+    <p class="hint">只輸入日期和金額的對帳單，獨立作業，不連品項，也不算進客戶的未收金額。</p>
+    <div class="card pad">
+      <div class="fields">
+        <label class="f span2"><span class="lbl">客戶（空白＝全部）</span><input type="text" id="man-f-cust" data-combo="customers" autocomplete="off" placeholder="輸入名稱或代號"></label>
+        <label class="f"><span class="lbl">對帳月份（空白＝全部）</span><input type="month" id="man-f-month"></label>
+      </div>
+    </div>
+    <div class="card"><div class="table-wrap" id="man-list"></div></div>
+  </section>
+
+  <!-- 手開對帳單：編輯 -->
+  <section class="view" id="view-man-edit"></section>
+
+  <!-- 對帳單 -->
+  <section class="view" id="view-stmt">
+    <div class="head"><h1>對帳單・收款</h1></div>
+    <div class="card pad">
+      <div class="fields">
+        <label class="f span2"><span class="lbl">客戶</span><input type="text" id="st-cust" data-combo="customers" autocomplete="off" placeholder="輸入名稱或代號"></label>
+        <label class="f"><span class="lbl">對帳月份</span><input type="month" id="st-month"></label>
+        <div class="f"><span class="lbl">對帳單明細</span>
+          <div class="seg" id="st-mode">
+            <button type="button" data-mode="summary" aria-pressed="true">每張單一列</button>
+            <button type="button" data-mode="detail" aria-pressed="false">展開品項</button>
+          </div>
+        </div>
+        <label class="f"><span class="lbl">期間開始</span><input type="date" id="st-start"></label>
+        <label class="f"><span class="lbl">期間結束</span><input type="date" id="st-end"></label>
+        <div class="f span2" style="justify-content: flex-end">
+          <span class="info-line" id="st-cust-info"></span>
+        </div>
+      </div>
+    </div>
+    <div class="row">
+      <div class="grow stack">
+        <div class="card" id="st-preview"><div class="empty">選擇客戶和月份，就會列出這段期間的出貨單。</div></div>
+        <div class="card">
+          <div style="padding: 16px 20px 0"><h2>已建立的對帳單</h2></div>
+          <div class="table-wrap" id="st-list"></div>
+        </div>
+      </div>
+      <div class="side stack">
+        <div class="card pad" id="st-summary"></div>
+        <div class="card pad">
+          <h2>收款</h2>
+          <div class="fields two">
+            <label class="f"><span class="lbl">收款日期</span><input type="date" id="pay-date"></label>
+            <label class="f"><span class="lbl">金額</span><input type="text" id="pay-amount" inputmode="numeric"></label>
+            <label class="f"><span class="lbl">方式</span>
+              <select id="pay-method"><option>現金</option><option>匯款</option><option>支票</option><option>其他</option></select></label>
+            <label class="f"><span class="lbl">備註</span><input type="text" id="pay-note"></label>
+          </div>
+          <div class="actions" style="margin-top: 12px"><button type="button" class="btn primary" id="pay-add">登錄收款</button></div>
+          <div id="pay-list" style="margin-top: 12px"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 品項 -->
+  <section class="view" id="view-prod">
+    <div class="head">
+      <h1>品項</h1>
+      <div class="actions">
+        <input type="search" id="prod-search" placeholder="搜尋品名或代號" style="width: 220px" aria-label="搜尋品項">
+        <label class="check"><input type="checkbox" id="prod-show-inactive">顯示停用</label>
+        <button type="button" class="btn primary" id="prod-new">＋ 新增品項</button>
+      </div>
+    </div>
+    <div class="row">
+      <div class="grow card"><div class="table-wrap" id="prod-list"></div></div>
+      <div class="side stack">
+        <div class="card pad">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:12px">
+            <h2 id="prod-form-title" style="margin:0">新增品項</h2>
+            <button type="button" class="btn small" id="p-to-new" hidden>改為新增</button>
+          </div>
+          <div class="fields two">
+            <label class="f"><span class="lbl">代號</span><input type="text" id="p-code"></label>
+            <label class="f"><span class="lbl">單位</span><input type="text" id="p-unit" placeholder="斤、片、盒…"></label>
+            <label class="f span2"><span class="lbl">品名（列印用）</span><input type="text" id="p-name"><span class="info-line warn-text" id="p-name-warn"></span></label>
+            <label class="f"><span class="lbl">預設單價（空白＝時價）</span><input type="text" id="p-price" inputmode="decimal"></label>
+            <label class="check" style="align-self: end"><input type="checkbox" id="p-weighed">秤重（可輸入斤兩）</label>
+            <label class="check span2"><input type="checkbox" id="p-active" checked>使用中</label>
+          </div>
+          <div class="actions" style="margin-top: 12px"><button type="button" class="btn primary" id="p-save">新增品項</button></div>
+        </div>
+        <div class="card pad" id="prod-prices">
+          <h2>客戶專屬價</h2>
+          <p class="hint">設定後開單會優先帶這個價格；沒設定就帶此客戶上次成交價，再沒有才用預設價。</p>
+          <div id="cp-list" style="margin: 10px 0"></div>
+          <div class="fields two">
+            <label class="f"><span class="lbl">客戶</span><input type="text" id="cp-cust" data-combo="customers" autocomplete="off"></label>
+            <label class="f"><span class="lbl">單價</span><input type="text" id="cp-price" inputmode="decimal"></label>
+          </div>
+          <div class="actions" style="margin-top: 10px"><button type="button" class="btn" id="cp-add">加入／更新</button></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 客戶 -->
+  <section class="view" id="view-cust">
+    <div class="head">
+      <h1>客戶</h1>
+      <div class="actions">
+        <input type="search" id="cust-search" placeholder="搜尋名稱、代號或電話" style="width: 220px" aria-label="搜尋客戶">
+        <label class="check"><input type="checkbox" id="cust-show-inactive">顯示停用</label>
+        <button type="button" class="btn primary" id="cust-new">＋ 新增客戶</button>
+      </div>
+    </div>
+    <div class="row">
+      <div class="grow card"><div class="table-wrap" id="cust-list"></div></div>
+      <div class="side card pad">
+        <div id="c-review" hidden></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:12px">
+          <h2 id="cust-form-title" style="margin:0">新增客戶</h2>
+          <button type="button" class="btn small" id="c-to-new" hidden>改為新增</button>
+        </div>
+        <div class="fields two">
+          <label class="f span2"><span class="lbl">公司名稱（列印用）</span><input type="text" id="c-name"><span class="info-line warn-text" id="c-name-warn"></span></label>
+          <label class="f"><span class="lbl">代號</span><input type="text" id="c-code"></label>
+          <label class="f"><span class="lbl">統一編號</span><input type="text" id="c-taxid"></label>
+          <label class="f"><span class="lbl">電話</span><input type="text" id="c-phone"></label>
+          <label class="f"><span class="lbl">聯絡人</span><input type="text" id="c-contact"></label>
+          <label class="f span2"><span class="lbl">聯絡地址</span><input type="text" id="c-address"></label>
+          <label class="f"><span class="lbl">結帳日</span><select id="c-closing"></select></label>
+          <label class="f"><span class="lbl">稅別</span>
+            <select id="c-tax"><option value="exclusive">外加 5%</option><option value="inclusive">內含 5%</option><option value="none">免稅</option></select></label>
+          <label class="f span2"><span class="lbl">備註（開單時顯示，不列印）</span><textarea id="c-note"></textarea></label>
+          <label class="check span2"><input type="checkbox" id="c-active" checked>使用中</label>
+        </div>
+        <div class="actions" style="margin-top: 12px"><button type="button" class="btn primary" id="c-save">新增客戶</button></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 設定 -->
+  <section class="view" id="view-set">
+    <div class="head"><h1>設定</h1>
+      <div class="actions"><button type="button" class="btn primary" id="set-save">儲存設定</button></div>
+    </div>
+    <div class="row">
+      <div class="grow stack">
+        <div class="card pad">
+          <h2>單據內容</h2>
+          <div class="fields two">
+            <label class="f"><span class="lbl">公司名稱（單據標題）</span><input type="text" id="s-company"></label>
+            <label class="f"><span class="lbl">預設製表人員</span><input type="text" id="s-maker"></label>
+            <label class="f span2"><span class="lbl">簽名欄（用逗號分隔）</span><input type="text" id="s-sign"></label>
+            <label class="f span2"><span class="lbl">手開對帳單預設版面（每張單也可以自己切換）</span>
+              <select id="s-manual-layout">
+                <option value="double">左右兩欄（一張中一刀約 28 天）</option>
+                <option value="single">單欄（跟出貨單一樣，一張 14 天）</option>
+              </select></label>
+          </div>
+        </div>
+        <div class="card pad">
+          <h2>列印</h2>
+          <div class="fields">
+            <label class="f span2"><span class="lbl">列印方式</span>
+              <select id="s-mode">
+                <option value="escp">文字模式（直送 LQ-310，複寫紙較清楚）</option>
+                <option value="driver">驅動程式（印表機沒有中文字型時使用）</option>
+              </select></label>
+            <label class="f span2"><span class="lbl">印表機</span><select id="s-printer"></select></label>
+            <label class="f"><span class="lbl">每頁行數</span><input type="number" id="s-lines" min="20" max="127"></label>
+            <label class="f"><span class="lbl">行距（1/180 吋）</span><input type="number" id="s-spacing" min="10" max="90"></label>
+            <label class="f"><span class="lbl">上留白（行）</span><input type="number" id="s-top" min="0" max="20"></label>
+            <label class="f"><span class="lbl">下留白（行）</span><input type="number" id="s-bottom" min="0" max="20"></label>
+            <label class="f"><span class="lbl">左邊界（字）</span><input type="number" id="s-left" min="0" max="40"></label>
+            <label class="f"><span class="lbl">每行字數（半形）</span><input type="number" id="s-cols" min="60" max="136"></label>
+            <label class="f"><span class="lbl">字距</span>
+              <select id="s-cpi"><option value="10">10 字／吋</option><option value="12">12 字／吋</option><option value="15">15 字／吋</option></select></label>
+            <label class="check"><input type="checkbox" id="s-chinese">送出中文模式指令</label>
+            <label class="f span2"><span class="lbl">紙張方式</span>
+              <select id="s-paper">
+                <option value="half">一律用中一刀（半張），筆數多就接續印下一張</option>
+                <option value="auto">放得下就印半張，放不下印整張</option>
+                <option value="full">一律整張</option>
+              </select></label>
+            <label class="check span4"><input type="checkbox" id="s-continuous">連續報表（第二張起直接接著印明細，不重印欄位名稱、不印頁碼）</label>
+            <label class="f"><span class="lbl">驅動程式紙張寬（公分）</span><input type="number" id="s-pw" step="0.01" min="5" max="40"></label>
+            <label class="f"><span class="lbl">驅動程式紙張長（公分）</span><input type="number" id="s-ph" step="0.01" min="5" max="40"></label>
+          </div>
+          <p class="hint" style="margin-top: 12px">9½×11 吋紙、行距 30（1/6 吋）時每頁 66 行，半張（中一刀）33 行。每頁行數請設成偶數，半張才會剛好停在撕線。驅動程式模式下，紙張寬、長要和 LQ-310「自訂紙張」裡中一刀的尺寸一樣（目前 21 × 14 公分）。先印對位測試頁，對照實際撕線位置再調整數字。</p>
+          <div class="actions" style="margin-top: 12px">
+            <button type="button" class="btn" id="set-test-preview">預覽對位測試頁</button>
+            <button type="button" class="btn" id="set-test-print">列印對位測試頁</button>
+          </div>
+        </div>
+      </div>
+      <div class="side stack">
+        <div class="card pad" id="sync-card">
+          <h2>手持機同步</h2>
+          <div class="fields two">
+            <label class="check span2"><input type="checkbox" id="s-sync-enabled">啟用同步服務</label>
+            <label class="f"><span class="lbl">連接埠</span><input type="number" id="s-sync-port" min="1024" max="65535"></label>
+          </div>
+          <div id="sync-status" style="margin-top:12px"></div>
+          <div class="actions" style="margin-top:12px"><button type="button" class="btn primary" id="btn-pair">＋ 新增手持機</button></div>
+          <div id="device-list" style="margin-top:12px"></div>
+        </div>
+        <div class="card pad">
+          <h2>資料與備份</h2>
+          <p class="hint">資料位置</p>
+          <p id="s-datadir" style="margin: 4px 0 12px; word-break: break-all; font-size: 14px"></p>
+          <p class="hint">每天第一次開程式會自動備份，保留最近 30 份。</p>
+          <p class="hint" id="s-lastbackup" style="margin-top: 6px"></p>
+          <label class="f" style="margin-top: 12px"><span class="lbl">額外備份資料夾（例如雲端同步資料夾，可空白）</span><input type="text" id="s-extra" placeholder="D:\Dropbox\出貨系統備份"></label>
+          <div class="actions" style="margin-top: 12px"><button type="button" class="btn" id="set-backup">立即備份</button></div>
+        </div>
+        <div class="card pad"><p class="hint" id="s-version"></p></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div id="combo-pop" class="combo-pop" role="listbox" hidden></div>
+
+<div class="modal-back" id="confirm-back">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="confirm-msg">
+    <p id="confirm-msg"></p>
+    <div class="actions">
+      <button type="button" class="btn" id="confirm-cancel">取消</button>
+      <button type="button" class="btn primary" id="confirm-ok">確定</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-back" id="preview-back">
+  <div class="modal preview-modal" role="dialog" aria-modal="true" aria-labelledby="preview-title">
+    <div class="preview-head">
+      <h2 id="preview-title">預覽</h2>
+      <div class="actions">
+        <button type="button" class="btn" id="preview-close">關閉</button>
+        <button type="button" class="btn primary" id="preview-print">列印</button>
+      </div>
+    </div>
+    <div class="preview-body"><div class="preview-pages" id="preview-pages"></div></div>
+  </div>
+</div>
+
+<div class="modal-back" id="pair-back">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="pair-title" style="width:min(520px,94vw)">
+    <h2 id="pair-title" style="margin:0;font-size:18px">新增手持機</h2>
+    <div id="pair-body"></div>
+    <div class="actions"><button type="button" class="btn" id="pair-close">關閉</button></div>
+  </div>
+</div>
+
+<div class="modal-back" id="conflict-back">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="conflict-title" style="width:min(760px,96vw);max-height:88vh;overflow:auto">
+    <h2 id="conflict-title" style="margin:0;font-size:18px">手持機同步提醒</h2>
+    <div id="conflict-list" class="stack"></div>
+    <div class="actions"><button type="button" class="btn" id="conflict-close">關閉</button></div>
+  </div>
+</div>
+
+<div id="print-root"></div>
+<div id="toast" aria-live="polite"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
