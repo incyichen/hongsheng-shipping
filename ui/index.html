@@ -135,7 +135,7 @@
             <label class="check" style="align-self: end"><input type="checkbox" id="p-weighed">秤重（可輸入斤兩）</label>
             <label class="check span2"><input type="checkbox" id="p-active" checked>使用中</label>
           </div>
-          <div class="actions" style="margin-top: 12px"><button type="button" class="btn primary" id="p-save">新增品項</button></div>
+          <div class="actions" style="margin-top: 12px;justify-content:space-between"><button type="button" class="btn danger" id="p-delete" hidden>刪除</button><button type="button" class="btn primary" id="p-save">新增品項</button></div>
         </div>
         <div class="card pad" id="prod-prices">
           <h2>客戶專屬價</h2>
@@ -182,7 +182,7 @@
           <label class="f span2"><span class="lbl">備註（開單時顯示，不列印）</span><textarea id="c-note"></textarea></label>
           <label class="check span2"><input type="checkbox" id="c-active" checked>使用中</label>
         </div>
-        <div class="actions" style="margin-top: 12px"><button type="button" class="btn primary" id="c-save">新增客戶</button></div>
+        <div class="actions" style="margin-top: 12px;justify-content:space-between"><button type="button" class="btn danger" id="c-delete" hidden>刪除</button><button type="button" class="btn primary" id="c-save">新增客戶</button></div>
       </div>
     </div>
   </section>
@@ -244,13 +244,13 @@
       </div>
       <div class="side stack">
         <div class="card pad" id="sync-card">
-          <h2>手持機同步</h2>
+          <h2>手機同步</h2>
           <div class="fields two">
             <label class="check span2"><input type="checkbox" id="s-sync-enabled">啟用同步服務</label>
             <label class="f"><span class="lbl">連接埠</span><input type="number" id="s-sync-port" min="1024" max="65535"></label>
           </div>
           <div id="sync-status" style="margin-top:12px"></div>
-          <div class="actions" style="margin-top:12px"><button type="button" class="btn primary" id="btn-pair">＋ 新增手持機</button></div>
+          <div class="actions" style="margin-top:12px"><button type="button" class="btn primary" id="btn-pair">＋ 新增手機</button></div>
           <div id="device-list" style="margin-top:12px"></div>
         </div>
         <div class="card pad">
@@ -295,7 +295,7 @@
 
 <div class="modal-back" id="pair-back">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="pair-title" style="width:min(520px,94vw)">
-    <h2 id="pair-title" style="margin:0;font-size:18px">新增手持機</h2>
+    <h2 id="pair-title" style="margin:0;font-size:18px">新增手機</h2>
     <div id="pair-body"></div>
     <div class="actions"><button type="button" class="btn" id="pair-close">關閉</button></div>
   </div>
@@ -303,7 +303,7 @@
 
 <div class="modal-back" id="conflict-back">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="conflict-title" style="width:min(760px,96vw);max-height:88vh;overflow:auto">
-    <h2 id="conflict-title" style="margin:0;font-size:18px">手持機同步提醒</h2>
+    <h2 id="conflict-title" style="margin:0;font-size:18px">手機同步提醒</h2>
     <div id="conflict-list" class="stack"></div>
     <div class="actions"><button type="button" class="btn" id="conflict-close">關閉</button></div>
   </div>

@@ -6,7 +6,7 @@ use std::path::Path;
 use crate::models::*;
 use crate::util::{compute_totals, line_amount, parse_qty};
 
-const SCHEMA_VERSION: i64 = 3;
+const SCHEMA_VERSION: i64 = 4;
 
 /// 第 1 版資料表（最早的版本）。獨立出來，測試才能建出真正的舊版資料庫來驗證升級。
 const MIGRATION_V1: &str = r#"
@@ -114,9 +114,9 @@ pub struct Db {
 /// 儲存單據時的額外選項（同步用）
 #[derive(Default)]
 pub(crate) struct SaveOpts {
-    /// 新單指定單號（手持機開的單）
+    /// 新單指定單號（手機開的單）
     pub doc_no: Option<String>,
-    /// 新單指定 uid（手持機產生的）
+    /// 新單指定 uid（手機產生的）
     pub uid: Option<String>,
     /// 來源裝置字頭，空白＝電腦
     pub origin: String,
@@ -209,9 +209,9 @@ COMMIT;
             )?;
         }
         if v < 3 {
-            // 第 3 版：手持機同步
+            // 第 3 版：手機同步
             //  - uid：跨裝置不變的編號；rev：每次新增或修改都遞增的變更序號；origin：哪一台開的（空白＝電腦）
-            //  - 觸發器自動維護 uid、rev，刪除時留下墓碑，讓手持機知道要移除
+            //  - 觸發器自動維護 uid、rev，刪除時留下墓碑，讓手機知道要移除
             let mut sql = String::from("BEGIN;\n");
             for t in ["customers", "products", "documents"] {
                 sql.push_str(&format!(
@@ -276,7 +276,7 @@ END;
 "
                 ));
             }
-            // 既有資料都給一個 rev，手持機第一次同步就會全部收到
+            // 既有資料都給一個 rev，手機第一次同步就會全部收到
             sql.push_str(
                 "UPDATE sync_counter SET v = 1;
 UPDATE customers SET rev = 1; UPDATE products SET rev = 1; UPDATE documents SET rev = 1;
@@ -285,7 +285,16 @@ COMMIT;",
             );
             self.conn.execute_batch(&sql)?;
         }
-        // 之後的結構變更：if v < 4 { ... PRAGMA user_version = 4; }
+        if v < 4 {
+            // 第 4 版：出貨單記錄「手機列印給客戶（出貨）」的時間
+            self.conn.execute_batch(
+                "BEGIN;
+ALTER TABLE documents ADD COLUMN shipped_at TEXT NOT NULL DEFAULT '';
+PRAGMA user_version = 4;
+COMMIT;",
+            )?;
+        }
+        // 之後的結構變更：if v < 5 { ... PRAGMA user_version = 5; }
         Ok(())
     }
 
@@ -524,7 +533,7 @@ COMMIT;",
     pub fn list_documents(&self, f: &DocFilter) -> Result<Vec<DocSummary>> {
         let mut sql = String::from(
             "SELECT d.id,d.doc_no,d.kind,d.customer_id,d.cust_name,d.doc_date,d.status,d.statement_id,
-             (SELECT COUNT(*) FROM document_lines l WHERE l.document_id=d.id), d.total, d.origin
+             (SELECT COUNT(*) FROM document_lines l WHERE l.document_id=d.id), d.total, d.origin, d.shipped_at
              FROM documents d WHERE 1=1",
         );
         let mut args: Vec<rusqlite::types::Value> = vec![];
@@ -558,6 +567,7 @@ COMMIT;",
                 item_count: r.get(8)?,
                 total: r.get(9)?,
                 origin: r.get(10)?,
+                shipped_at: r.get(11)?,
             })
         })?;
         Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
@@ -568,7 +578,7 @@ COMMIT;",
             .conn
             .query_row(
                 "SELECT d.id,d.doc_no,d.kind,d.customer_id,d.doc_date,d.maker,d.note,d.status,d.statement_id,s.stmt_no,
-                        d.cust_name,d.cust_phone,d.cust_address,d.tax_mode,d.subtotal,d.tax,d.total,d.uid,d.origin
+                        d.cust_name,d.cust_phone,d.cust_address,d.tax_mode,d.subtotal,d.tax,d.total,d.uid,d.origin,d.shipped_at
                  FROM documents d LEFT JOIN statements s ON s.id=d.statement_id WHERE d.id=?1",
                 params![id],
                 |r| {
@@ -592,6 +602,7 @@ COMMIT;",
                         total: r.get(16)?,
                         uid: r.get::<_, Option<String>>(17)?.unwrap_or_default(),
                         origin: r.get(18)?,
+                        shipped_at: r.get(19)?,
                         lines: vec![],
                     })
                 },
@@ -685,7 +696,7 @@ COMMIT;",
             }
             None => {
                 let no = match &opts.doc_no {
-                    // 手持機開的單：用手持機給的單號（字頭 V1-，不會跟電腦撞號）
+                    // 手機開的單：用手機給的單號（字頭 V1-，不會跟電腦撞號）
                     Some(no) => {
                         let used: i64 = tx.query_row("SELECT COUNT(*) FROM documents WHERE doc_no=?1", params![no], |r| r.get(0))?;
                         if used > 0 {
@@ -744,6 +755,42 @@ COMMIT;",
         tx.commit()?;
         let _ = doc_no;
         self.get_document(id)
+    }
+
+    /// 刪除客戶：沒有任何單據、收款、對帳單的直接刪除；用過的改為停用（舊單據不受影響）
+    /// 回傳 "deleted" 或 "deactivated"
+    pub fn delete_customer(&self, id: i64) -> Result<String> {
+        let used: i64 = self.conn.query_row(
+            "SELECT (SELECT COUNT(*) FROM documents WHERE customer_id=?1)
+                  + (SELECT COUNT(*) FROM payments WHERE customer_id=?1)
+                  + (SELECT COUNT(*) FROM statements WHERE customer_id=?1)
+                  + (SELECT COUNT(*) FROM manual_statements WHERE customer_id=?1)",
+            params![id],
+            |r| r.get(0),
+        )?;
+        if used > 0 {
+            self.conn.execute("UPDATE customers SET active=0, needs_review=0 WHERE id=?1", params![id])?;
+            return Ok("deactivated".into());
+        }
+        let tx = self.conn.unchecked_transaction()?;
+        tx.execute("DELETE FROM customer_prices WHERE customer_id=?1", params![id])?;
+        tx.execute("DELETE FROM customers WHERE id=?1", params![id])?;
+        tx.commit()?;
+        Ok("deleted".into())
+    }
+
+    /// 刪除品項：出貨單用過的改為停用，沒用過的直接刪除
+    pub fn delete_product(&self, id: i64) -> Result<String> {
+        let used: i64 = self.conn.query_row("SELECT COUNT(*) FROM document_lines WHERE product_id=?1", params![id], |r| r.get(0))?;
+        if used > 0 {
+            self.conn.execute("UPDATE products SET active=0 WHERE id=?1", params![id])?;
+            return Ok("deactivated".into());
+        }
+        let tx = self.conn.unchecked_transaction()?;
+        tx.execute("DELETE FROM customer_prices WHERE product_id=?1", params![id])?;
+        tx.execute("DELETE FROM products WHERE id=?1", params![id])?;
+        tx.commit()?;
+        Ok("deleted".into())
     }
 
     pub fn delete_document(&self, id: i64) -> Result<()> {

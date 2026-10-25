@@ -12,7 +12,7 @@ android {
         minSdk = 26
         targetSdk = 34
         versionCode = (System.getenv("APP_VERSION_CODE") ?: "1").toInt()
-        versionName = System.getenv("APP_VERSION_NAME") ?: "0.4.0"
+        versionName = System.getenv("APP_VERSION_NAME") ?: "0.5.0"
     }
 
     // 固定簽章：之後的新版可以直接覆蓋安裝，不用先移除（移除會清掉手持機上的資料）

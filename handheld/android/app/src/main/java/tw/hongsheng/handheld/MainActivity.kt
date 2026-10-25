@@ -2,6 +2,7 @@ package tw.hongsheng.handheld
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.ConnectivityManager
 import android.net.Network
@@ -50,6 +51,15 @@ class MainActivity : AppCompatActivity() {
         web.webViewClient = object : WebViewClient() {
             override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? =
                 loader.shouldInterceptRequest(request.url)
+
+            // 客戶頁的「撥打」：交給手機的電話 App
+            override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
+                if (request.url.scheme == "tel") {
+                    try { startActivity(Intent(Intent.ACTION_DIAL, request.url)) } catch (_: Exception) { }
+                    return true
+                }
+                return false
+            }
         }
         web.addJavascriptInterface(Bridge(), "Native")
         setContentView(web)

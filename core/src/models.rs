@@ -18,9 +18,9 @@ pub struct Customer {
     pub active: bool,
     /// 跨裝置不變的編號（同步用）
     pub uid: String,
-    /// 哪一台建立的：空白＝電腦，"V1"＝第一台手持機
+    /// 哪一台建立的：空白＝電腦，"V1"＝第一台手機
     pub origin: String,
-    /// 手持機新增、電腦還沒確認過
+    /// 手機新增、電腦還沒確認過
     pub needs_review: bool,
 }
 
@@ -96,8 +96,10 @@ pub struct Document {
     pub tax: i64,
     pub total: i64,
     pub uid: String,
-    /// 哪一台開的：空白＝電腦，"V1"＝第一台手持機
+    /// 哪一台開的：空白＝電腦，"V1"＝第一台手機
     pub origin: String,
+    /// 手機列印給客戶（出貨）的時間；空白＝還沒出貨
+    pub shipped_at: String,
     pub lines: Vec<DocLine>,
 }
 
@@ -116,6 +118,7 @@ pub struct DocSummary {
     pub total: i64,
     /// 哪一台開的：空白＝電腦
     pub origin: String,
+    pub shipped_at: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -296,7 +299,7 @@ pub struct AppSettings {
     pub extra_backup_dir: String,
     /// 新開手開對帳單時預設的列印版面："single" 或 "double"
     pub manual_layout: String,
-    /// 手持機同步服務
+    /// 手機同步服務
     pub sync_enabled: bool,
     pub sync_port: u16,
     pub print: PrintConfig,

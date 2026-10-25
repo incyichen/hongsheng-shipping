@@ -299,7 +299,7 @@ window.addEventListener('resize', () => { if (Combo.input) comboPlace(); });
 document.addEventListener('scroll', () => { if (Combo.input) comboPlace(); }, true);
 
 // ============================================================
-// 手持機同步：設定、配對、同步提醒、新客戶確認與合併
+// 手機同步：設定、配對、同步提醒、新客戶確認與合併
 // ============================================================
 function setNavCount(view, n) {
   const b = $(`#nav button[data-view="${view}"]`);
@@ -317,14 +317,14 @@ async function renderSyncCard() {
   try { st = await invoke('sync_status'); } catch (e) { $('#sync-status').textContent = String(e); return; }
   const box = $('#sync-status');
   if (!st.enabled) {
-    box.innerHTML = '<p class="hint">同步服務已關閉，手持機無法連線。</p>';
+    box.innerHTML = '<p class="hint">同步服務已關閉，手機無法連線。</p>';
   } else if (st.error) {
     box.innerHTML = `<div class="banner warn">${esc(st.error)}<br>可能是這個連接埠被其他程式使用，請換一個連接埠後儲存設定。</div>`;
   } else {
     const addrs = st.addresses.map((a) => `<div><span class="addr">${esc(a.ip)}:${st.port}</span>　<span class="hint">${esc(a.kind)}</span></div>`).join('');
     box.innerHTML = `<p class="hint" style="color:var(--accent-dark);font-weight:600">● 運作中</p>
-      <p class="hint" style="margin-top:6px">手持機要連到這台電腦的位址：</p>${addrs || '<p class="hint">找不到網路位址，請確認電腦有連上網路。</p>'}
-      ${st.addresses.some((a) => a.kind === 'Tailscale') ? '' : '<p class="hint warn-text" style="margin-top:6px">沒有偵測到 Tailscale，手持機外出時會連不到。請先安裝並登入 Tailscale。</p>'}`;
+      <p class="hint" style="margin-top:6px">手機要連到這台電腦的位址：</p>${addrs || '<p class="hint">找不到網路位址，請確認電腦有連上網路。</p>'}
+      ${st.addresses.some((a) => a.kind === 'Tailscale') ? '' : '<p class="hint warn-text" style="margin-top:6px">沒有偵測到 Tailscale，手機外出時會連不到。請先安裝並登入 Tailscale。</p>'}`;
   }
   const devices = await call('list_devices');
   $('#device-list').innerHTML = devices.length
@@ -333,13 +333,13 @@ async function renderSyncCard() {
           <div class="hint">上次同步：${esc(fmtTime(d.last_sync_at))}</div></div>
         ${d.revoked ? '' : `<button type="button" class="btn small danger" data-revoke="${d.id}" data-name="${esc(d.name)}">停用</button>`}
       </div>`).join('')
-    : '<p class="hint">還沒有配對任何手持機。</p>';
+    : '<p class="hint">還沒有配對任何手機。</p>';
 }
 
 $('#device-list').addEventListener('click', async (e) => {
   const b = e.target.closest('[data-revoke]');
   if (!b) return;
-  if (!(await confirmBox(`停用「${b.dataset.name}」？\n停用後這台手持機就不能再同步。手持機遺失或換機時使用。\n已同步上來的單據不受影響。`, '停用'))) return;
+  if (!(await confirmBox(`停用「${b.dataset.name}」？\n停用後這台手機就不能再同步。手機遺失或換機時使用。\n已同步上來的單據不受影響。`, '停用'))) return;
   await call('revoke_device', { id: Number(b.dataset.revoke) });
   toast(`已停用 ${b.dataset.name}`);
   renderSyncCard();
@@ -354,11 +354,11 @@ $('#btn-pair').addEventListener('click', async () => {
   const before = (await call('list_devices')).length;
   const addrs = st.addresses.map((a) => `<div><span class="addr">${esc(a.ip)}:${st.port}</span>　<span class="hint">${esc(a.kind)}</span></div>`).join('');
   $('#pair-body').innerHTML = `
-    <p style="margin:0 0 10px">在手持機的 App 裡選「連線到電腦」，輸入電腦位址和這組配對碼：</p>
+    <p style="margin:0 0 10px">在手機的 App 裡選「連線到電腦」，輸入電腦位址和這組配對碼：</p>
     <div class="pair-code">${esc(pc.code)}</div>
-    <p class="hint" style="text-align:center;margin-top:8px">這台手持機的單號字頭會是 <b>${esc(pc.prefix)}</b>（例如 ${esc(pc.prefix)}-202610-0001）。配對碼 10 分鐘內有效、只能用一次。</p>
+    <p class="hint" style="text-align:center;margin-top:8px">這台手機的單號字頭會是 <b>${esc(pc.prefix)}</b>（例如 ${esc(pc.prefix)}-202610-0001）。配對碼 10 分鐘內有效、只能用一次。</p>
     <div style="margin-top:14px"><p class="hint" style="margin-bottom:4px">電腦位址（外出時用 Tailscale 那一個）：</p>${addrs}</div>
-    <p id="pair-wait" class="hint" style="margin-top:14px">等待手持機配對中…</p>`;
+    <p id="pair-wait" class="hint" style="margin-top:14px">等待手機配對中…</p>`;
   $('#pair-back').classList.add('open');
   clearInterval(pairTimer);
   pairTimer = setInterval(async () => {
@@ -375,10 +375,10 @@ $('#pair-close').addEventListener('click', () => { clearInterval(pairTimer); $('
 
 const CONFLICT_LABEL = {
   both_edited: '兩邊都修改了草稿',
-  pc_overwritten: '手持機版本已覆蓋電腦的修改',
-  locked: '已列入對帳單，手持機修改未套用',
+  pc_overwritten: '手機版本已覆蓋電腦的修改',
+  locked: '已列入對帳單，手機修改未套用',
   deleted_on_pc: '電腦上刪除過的單',
-  delete_rejected: '手持機刪除未執行',
+  delete_rejected: '手機刪除未執行',
   late_period: '沒有列入已建立的對帳單',
 };
 
@@ -388,7 +388,7 @@ async function renderSyncBanner() {
   setNavCount('ship', list.length);
   $('#sync-banner').innerHTML = list.length
     ? `<div class="banner warn" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
-        <span>手持機同步有 <b>${list.length}</b> 筆需要你看一下</span>
+        <span>手機同步有 <b>${list.length}</b> 筆需要你看一下</span>
         <button type="button" class="btn small" id="btn-conflicts">查看</button></div>`
     : '';
   if (list.length) $('#btn-conflicts').onclick = openConflicts;
@@ -403,20 +403,20 @@ async function openConflicts() {
     if (c.payload) {
       try {
         const w = JSON.parse(c.payload);
-        const label = c.kind === 'pc_overwritten' ? '電腦原本的版本' : '手持機的版本';
+        const label = c.kind === 'pc_overwritten' ? '電腦原本的版本' : '手機的版本';
         detail = `<details><summary class="hint" style="cursor:pointer">${label}：${w.lines.length} 項${w.total ? `，合計 ${fmtInt(w.total)}` : ''}</summary>
           <div class="hint" style="margin-top:6px">${w.lines.map((l) => `${esc(l.name)}　${esc(l.qty_text)} × ${fmtNum(l.price)}`).join('<br>')}</div></details>`;
       } catch { /* 略過 */ }
     }
     const id = byNo[c.doc_no];
     return `<div class="conflict-item">
-      <div class="meta"><b>${esc(c.doc_no || '（無單號）')}</b><span class="badge hh">手持機 ${esc(c.device_prefix)}</span><span class="badge review">${esc(CONFLICT_LABEL[c.kind] || c.kind)}</span><span class="hint">${esc(fmtTime(c.created_at))}</span></div>
+      <div class="meta"><b>${esc(c.doc_no || '（無單號）')}</b><span class="badge hh">手機 ${esc(c.device_prefix)}</span><span class="badge review">${esc(CONFLICT_LABEL[c.kind] || c.kind)}</span><span class="hint">${esc(fmtTime(c.created_at))}</span></div>
       <div>${esc(c.message)}</div>${detail}
       <div class="actions">
         ${id ? `<button type="button" class="btn small" data-open-doc="${id}">開啟單據</button>` : ''}
         ${c.can_use_handheld
           ? `<button type="button" class="btn small" data-resolve="${c.id}" data-action="dismiss">保留電腦版本</button>
-             <button type="button" class="btn small primary" data-resolve="${c.id}" data-action="use_handheld">改用手持機版本</button>`
+             <button type="button" class="btn small primary" data-resolve="${c.id}" data-action="use_handheld">改用手機版本</button>`
           : `<button type="button" class="btn small primary" data-resolve="${c.id}" data-action="dismiss">知道了</button>`}
       </div></div>`;
   }).join('') : '<p class="hint">目前沒有需要處理的項目。</p>';
@@ -428,21 +428,21 @@ $('#conflict-list').addEventListener('click', async (e) => {
   if (open) { $('#conflict-back').classList.remove('open'); openDoc(Number(open.dataset.openDoc)); return; }
   const b = e.target.closest('[data-resolve]');
   if (!b) return;
-  if (b.dataset.action === 'use_handheld' && !(await confirmBox('改用手持機的版本？電腦上這張單目前的內容會被取代。', '改用手持機版本'))) return;
+  if (b.dataset.action === 'use_handheld' && !(await confirmBox('改用手機的版本？電腦上這張單目前的內容會被取代。', '改用手機版本'))) return;
   await call('resolve_sync_conflict', { id: Number(b.dataset.resolve), action: b.dataset.action });
-  toast(b.dataset.action === 'use_handheld' ? '已改用手持機版本' : '已處理');
+  toast(b.dataset.action === 'use_handheld' ? '已改用手機版本' : '已處理');
   openConflicts();
   renderSyncBanner();
 });
 
-// 手持機新增的客戶：確認無誤，或合併到既有客戶
+// 手機新增的客戶：確認無誤，或合併到既有客戶
 async function renderCustReview(c) {
   const box = $('#c-review');
   if (!c || !c.needs_review) { box.hidden = true; box.innerHTML = ''; return; }
   const dups = await call('possible_duplicates', { customerId: c.id });
   box.hidden = false;
   box.innerHTML = `<div class="review-box">
-    <div><b>手持機 ${esc(c.origin)} 新增的客戶</b>，請確認資料，或合併到既有客戶。</div>
+    <div><b>手機 ${esc(c.origin)} 新增的客戶</b>，請確認資料，或合併到既有客戶。</div>
     ${dups.length ? `<div class="warn-text">可能跟這些客戶重複（名稱或電話相同）：</div>
       ${dups.map(([id, name]) => `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span>${esc(name)}</span>
         <button type="button" class="btn small" data-merge-to="${id}" data-merge-name="${esc(name)}">合併到這位</button></div>`).join('')}` : ''}
@@ -454,7 +454,7 @@ async function renderCustReview(c) {
   </div>`;
   const merge = async (toId, toName) => {
     if (toId === c.id) { toast('不能合併到自己', 'error'); return; }
-    if (!(await confirmBox(`把「${c.name}」合併到「${toName}」？\n「${c.name}」的出貨單、收款、對帳單都會移到「${toName}」，然後刪除「${c.name}」。\n手持機下次同步也會跟著更新。這個動作無法復原。`, '合併'))) return;
+    if (!(await confirmBox(`把「${c.name}」合併到「${toName}」？\n「${c.name}」的出貨單、收款、對帳單都會移到「${toName}」，然後刪除「${c.name}」。\n手機下次同步也會跟著更新。這個動作無法復原。`, '合併'))) return;
     await call('merge_customers', { fromId: c.id, toId });
     await loadCustomers();
     toast(`已合併到 ${toName}`);
@@ -474,7 +474,7 @@ async function renderCustReview(c) {
   };
 }
 
-// 手持機隨時可能同步：定時更新提醒與清單（只在不會打斷輸入的畫面）
+// 手機隨時可能同步：定時更新提醒與清單（只在不會打斷輸入的畫面）
 setInterval(async () => {
   if (document.querySelector('.modal-back.open')) return;
   // 客戶、品項清單（選擇器也會用到）、待確認數量
@@ -509,7 +509,7 @@ async function showView(name) {
   if (name === 'ship') renderShipList();
   if (name === 'stmt') stmtRefresh();
   if (name === 'man') renderManList();
-  // 手持機可能新增了客戶或品項：進到這兩頁時重新讀取
+  // 手機可能新增了客戶或品項：進到這兩頁時重新讀取
   if (name === 'prod') { await loadProducts(); renderProdList(); }
   if (name === 'cust') { await loadCustomers(); renderCustList(); }
   if (name === 'set') renderSettings();
@@ -535,11 +535,11 @@ async function renderShipList() {
       <th>日期</th><th>單號</th><th>客戶</th><th class="num">品項</th><th class="num">金額</th><th>狀態</th></tr></thead><tbody>
     ${docs.map((d) => `<tr class="click" data-id="${d.id}">
       <td>${esc(slashDate(d.doc_date))}</td>
-      <td>${esc(d.doc_no)} ${d.kind === 'adjustment' ? '<span class="badge adj">退貨／折讓</span>' : ''}${d.origin ? ` <span class="badge hh">手持機 ${esc(d.origin)}</span>` : ''}</td>
+      <td>${esc(d.doc_no)} ${d.kind === 'adjustment' ? '<span class="badge adj">退貨／折讓</span>' : ''}${d.origin ? ` <span class="badge hh">手機 ${esc(d.origin)}</span>` : ''}</td>
       <td>${esc(d.cust_name)}</td>
       <td class="num">${d.item_count}</td>
       <td class="num">${fmtInt(d.total)}</td>
-      <td>${d.statement_id ? '<span class="badge locked">已對帳</span>' : d.status === 'draft' ? '<span class="badge draft">草稿</span>' : '<span class="badge">已開立</span>'}</td>
+      <td>${d.statement_id ? '<span class="badge locked">已對帳</span>' : d.status === 'draft' ? '<span class="badge draft">草稿</span>' : '<span class="badge">已開立</span>'}${d.shipped_at ? ` <span class="badge shipped" title="手機列印給客戶的時間">已出貨 ${esc(fmtTime(d.shipped_at))}</span>` : ''}</td>
     </tr>`).join('')}</tbody></table>`;
 }
 
@@ -1690,6 +1690,7 @@ function fillProdForm(p) {
   $('#prod-form-title').textContent = p ? `編輯品項：${p.name}` : '新增品項';
   $('#p-save').textContent = p ? '儲存修改' : '新增品項';
   $('#p-to-new').hidden = !p;
+  $('#p-delete').hidden = !p;
   $('#p-code').value = p ? p.code : '';
   $('#p-name').value = p ? p.name : '';
   $('#p-unit').value = p ? p.unit : '';
@@ -1741,6 +1742,14 @@ $('#p-save').addEventListener('click', async () => {
     fillProdForm(S.products.find((p) => p.id === id));
   }
 });
+$('#p-delete').addEventListener('click', async () => {
+  const p = S.products.find((x) => x.id === prodSel);
+  if (!p || !(await confirmBox(`刪除品項「${p.name}」？\n\n出貨單用過的品項會改成「停用」：不再出現在開單選單，舊單據不受影響。`, '刪除'))) return;
+  const r = await call('delete_product', { id: p.id });
+  await loadProducts();
+  toast(r === 'deleted' ? `已刪除 ${p.name}` : `${p.name} 有出貨紀錄，已改為停用`);
+  fillProdForm(null);
+});
 $('#cp-add').addEventListener('click', async () => {
   const c = findCustomer($('#cp-cust').value);
   const price = parseNum($('#cp-price').value);
@@ -1761,6 +1770,7 @@ $('#cp-list').addEventListener('click', async (e) => {
 // 客戶
 // ============================================================
 let custSel = null;
+const TAX_NAME = { exclusive: '外加 5%', inclusive: '內含 5%', none: '免稅' };
 
 function renderCustList() {
   const q = $('#cust-search').value.trim().toLowerCase();
@@ -1768,11 +1778,11 @@ function renderCustList() {
   const list = S.customers.filter((c) => (showInactive || c.active) &&
     (!q || c.name.toLowerCase().includes(q) || (c.code || '').toLowerCase().includes(q) || (c.phone || '').includes(q)))
     .sort((a, b) => Number(b.needs_review) - Number(a.needs_review));
-  $('#cust-list').innerHTML = list.length ? `<table class="grid"><thead><tr><th>代號</th><th>客戶名稱</th><th>電話</th><th>結帳日</th><th class="num">未收金額</th></tr></thead><tbody>
+  $('#cust-list').innerHTML = list.length ? `<table class="grid"><thead><tr><th>代號</th><th>客戶名稱</th><th>統編</th><th>稅別</th><th>電話</th><th>結帳日</th><th class="num">未收金額</th></tr></thead><tbody>
     ${list.map((c) => {
       const bal = S.balances[c.id] || 0;
       return `<tr class="click ${c.id === custSel ? 'selected' : ''} ${c.active ? '' : 'inactive'}" data-id="${c.id}">
-        <td>${esc(c.code)}</td><td>${esc(c.name)}${c.needs_review ? ` <span class="badge review">手持機 ${esc(c.origin)} 新增・待確認</span>` : ''}</td><td>${esc(c.phone)}</td><td>${closingLabel(c.closing_day)}</td>
+        <td>${esc(c.code)}</td><td>${esc(c.name)}${c.needs_review ? ` <span class="badge review">手機 ${esc(c.origin)} 新增・待確認</span>` : ''}${c.active ? '' : ' <span class="badge">停用</span>'}</td><td>${esc(c.tax_id)}</td><td>${TAX_NAME[c.tax_mode] || ''}</td><td>${esc(c.phone)}</td><td>${closingLabel(c.closing_day)}</td>
         <td class="num" style="${bal > 0 ? 'color:var(--warn);font-weight:600' : ''}">${fmtInt(bal)}</td></tr>`;
     }).join('')}</tbody></table>`
     : '<div class="empty">還沒有客戶，在右邊填好按「儲存客戶」。</div>';
@@ -1783,6 +1793,7 @@ function fillCustForm(c) {
   $('#cust-form-title').textContent = c ? `編輯客戶：${c.name}` : '新增客戶';
   $('#c-save').textContent = c ? '儲存修改' : '新增客戶';
   $('#c-to-new').hidden = !c;
+  $('#c-delete').hidden = !c;
   $('#c-name').value = c ? c.name : '';
   $('#c-code').value = c ? c.code : '';
   $('#c-taxid').value = c ? c.tax_id : '';
@@ -1808,6 +1819,14 @@ $('#cust-show-inactive').addEventListener('change', renderCustList);
 $('#cust-new').addEventListener('click', () => { fillCustForm(null); $('#c-name').focus(); });
 $('#c-to-new').addEventListener('click', () => { fillCustForm(null); $('#c-name').focus(); });
 $('#c-name').addEventListener('change', (e) => warnBig5(e.target, $('#c-name-warn')));
+$('#c-delete').addEventListener('click', async () => {
+  const c = customerById(custSel);
+  if (!c || !(await confirmBox(`刪除客戶「${c.name}」？\n\n有出貨單、收款或對帳單的客戶會改成「停用」：不再出現在開單選單，舊單據、帳款不受影響。`, '刪除'))) return;
+  const r = await call('delete_customer', { id: c.id });
+  await loadCustomers();
+  toast(r === 'deleted' ? `已刪除 ${c.name}` : `${c.name} 有交易紀錄，已改為停用`);
+  fillCustForm(null);
+});
 $('#c-save').addEventListener('click', async () => {
   const c = {
     id: custSel, code: $('#c-code').value, name: $('#c-name').value, tax_id: $('#c-taxid').value, phone: $('#c-phone').value,

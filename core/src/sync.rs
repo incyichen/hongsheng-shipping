@@ -1,14 +1,14 @@
-//! 手持機同步
+//! 手機同步
 //!
-//! 電腦是唯一的正式資料庫。手持機每次同步呼叫一次 `sync()`：
-//! 先把手持機的變更送上來（新客戶、新品項、出貨單），再把電腦上 `since_rev` 之後的變更送回去。
+//! 電腦是唯一的正式資料庫。手機每次同步呼叫一次 `sync()`：
+//! 先把手機的變更送上來（新客戶、新品項、出貨單），再把電腦上 `since_rev` 之後的變更送回去。
 //!
 //! 規則：
-//! - 客戶、品項、客戶專屬價、上次成交價：電腦 → 手持機（手持機只能「新增」客戶與品項）
+//! - 客戶、品項、客戶專屬價、上次成交價：電腦 → 手機（手機只能「新增」客戶與品項）
 //! - 出貨單：雙向。草稿全部同步；已開立的只送最近 `DOC_WINDOW_DAYS` 天（補印、看上次價格用）
-//! - 手持機新增的客戶標記「待確認」，電腦上確認或合併
-//! - 同一張單兩邊都改過：手持機已開立（客戶手上已有單）→ 手持機為準，電腦版另存；兩邊都是草稿 → 電腦版為準，手持機版另存，讓你選
-//! - 已列入對帳單的單：手持機的修改不套用，記一筆提醒
+//! - 手機新增的客戶標記「待確認」，電腦上確認或合併
+//! - 同一張單兩邊都改過：手機已開立（客戶手上已有單）→ 手機為準，電腦版另存；兩邊都是草稿 → 電腦版為準，手機版另存，讓你選
+//! - 已列入對帳單的單：手機的修改不套用，記一筆提醒
 
 use anyhow::{anyhow, bail, Result};
 use chrono::{Duration, Local};
@@ -27,7 +27,7 @@ const PAIRING_MINUTES: i64 = 10;
 /// 配對碼輸錯幾次就作廢
 const PAIRING_MAX_ATTEMPTS: i64 = 5;
 
-// ---------------- 傳輸格式（電腦 ⇄ 手持機） ----------------
+// ---------------- 傳輸格式（電腦 ⇄ 手機） ----------------
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 #[serde(default)]
@@ -86,7 +86,7 @@ pub struct WireDoc {
     pub maker: String,
     pub note: String,
     pub status: String,
-    /// 已列入對帳單（手持機只能看、補印）
+    /// 已列入對帳單（手機只能看、補印）
     pub locked: bool,
     pub statement_no: Option<String>,
     pub cust_name: String,
@@ -97,18 +97,20 @@ pub struct WireDoc {
     pub tax: i64,
     pub total: i64,
     pub origin: String,
+    /// 手機列印給客戶（出貨）的時間；空白＝還沒出貨
+    pub shipped_at: String,
     pub rev: i64,
     pub lines: Vec<WireLine>,
 }
 
-/// 手持機送上來的一張單
+/// 手機送上來的一張單
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(default)]
 pub struct PushDoc {
     pub doc: WireDoc,
-    /// 手持機修改時看到的電腦版本 rev；手持機新開的單為 None
+    /// 手機修改時看到的電腦版本 rev；手機新開的單為 None
     pub base_rev: Option<i64>,
-    /// 手持機刪除了這張草稿
+    /// 手機刪除了這張草稿
     pub deleted: bool,
 }
 
@@ -120,6 +122,15 @@ pub struct SyncRequest {
     pub customers: Vec<WireCustomer>,
     pub products: Vec<WireProduct>,
     pub documents: Vec<PushDoc>,
+    /// 手機已列印給客戶的單（只記出貨時間，不動單據內容）
+    pub shipped: Vec<ShippedMark>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+#[serde(default)]
+pub struct ShippedMark {
+    pub uid: String,
+    pub at: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
@@ -153,7 +164,7 @@ pub struct Deleted {
 pub struct SyncResponse {
     /// 下次同步帶這個值當 since_rev
     pub server_rev: i64,
-    /// since_rev 為 0 時送的是全部資料，手持機應以此取代本機資料
+    /// since_rev 為 0 時送的是全部資料，手機應以此取代本機資料
     pub full: bool,
     pub customers: Vec<WireCustomer>,
     pub products: Vec<WireProduct>,
@@ -163,14 +174,14 @@ pub struct SyncResponse {
     pub last_prices: Vec<PricePair>,
     pub documents: Vec<WireDoc>,
     pub deleted: Vec<Deleted>,
-    /// 客戶合併：舊 uid → 新 uid（手持機上還沒上傳的單要改指向新客戶）
+    /// 客戶合併：舊 uid → 新 uid（手機上還沒上傳的單要改指向新客戶）
     pub customer_merges: BTreeMap<String, String>,
-    /// 品項對應：手持機新增的品項，電腦上已有同名品項時，手持機 uid → 電腦 uid
+    /// 品項對應：手機新增的品項，電腦上已有同名品項時，手機 uid → 電腦 uid
     pub product_remaps: BTreeMap<String, String>,
     pub results: Vec<PushResult>,
     pub device_prefix: String,
     pub device_name: String,
-    /// 這台手持機每個月已用到的最大流水號（年月 → 號碼），手持機重裝後編號才不會重複
+    /// 這台手機每個月已用到的最大流水號（年月 → 號碼），手機重裝後編號才不會重複
     pub prefix_last_seq: BTreeMap<String, i64>,
     pub company_name: String,
     pub server_time: String,
@@ -220,7 +231,7 @@ pub struct SyncConflict {
     pub payload: String,
     pub created_at: String,
     pub resolved: bool,
-    /// 可以「改用手持機版本」
+    /// 可以「改用手機版本」
     pub can_use_handheld: bool,
 }
 
@@ -253,7 +264,7 @@ fn later(minutes: i64) -> String {
 impl Db {
     // ---------------- 配對與裝置 ----------------
 
-    /// 產生一組配對碼，並預留下一個手持機字頭（V1、V2…，用過的字頭不再重複使用）
+    /// 產生一組配對碼，並預留下一個手機字頭（V1、V2…，用過的字頭不再重複使用）
     pub fn create_pairing_code(&self) -> Result<PairingCode> {
         self.conn.execute("DELETE FROM pairing_codes WHERE expires_at < ?1", params![now()])?;
         let mut used: Vec<String> = self
@@ -262,14 +273,14 @@ impl Db {
             .query_map([], |r| r.get(0))?
             .collect::<rusqlite::Result<_>>()?;
         used.sort();
-        let prefix = (1..100).map(|i| format!("V{}", i)).find(|p| !used.contains(p)).ok_or_else(|| anyhow!("手持機數量已達上限"))?;
+        let prefix = (1..100).map(|i| format!("V{}", i)).find(|p| !used.contains(p)).ok_or_else(|| anyhow!("手機數量已達上限"))?;
         let code = random_code();
         let expires_at = later(PAIRING_MINUTES);
         self.conn.execute("INSERT INTO pairing_codes(code,prefix,expires_at) VALUES(?1,?2,?3)", params![code, prefix, expires_at])?;
         Ok(PairingCode { code, prefix, expires_at })
     }
 
-    /// 手持機輸入配對碼。成功回傳之後同步要用的 token（只會出現這一次）。
+    /// 手機輸入配對碼。成功回傳之後同步要用的 token（只會出現這一次）。
     pub fn pair_device(&self, code: &str, device_name: &str) -> Result<PairResult> {
         self.conn.execute("DELETE FROM pairing_codes WHERE expires_at < ?1", params![now()])?;
         let found: Option<String> = self
@@ -283,7 +294,7 @@ impl Db {
             bail!("配對碼錯誤或已過期，請在電腦上重新產生");
         };
         let token = random_token();
-        let name = if device_name.trim().is_empty() { format!("手持機 {}", prefix) } else { device_name.trim().to_string() };
+        let name = if device_name.trim().is_empty() { format!("手機 {}", prefix) } else { device_name.trim().to_string() };
         self.conn.execute(
             "INSERT INTO devices(name,prefix,token_hash,created_at) VALUES(?1,?2,?3,?4)",
             params![name, prefix, hash_token(&token), now()],
@@ -292,7 +303,7 @@ impl Db {
         Ok(PairResult { token, prefix, device_name: name, company_name: self.get_settings()?.company_name })
     }
 
-    /// 用 token 找出是哪一台手持機；停用的手持機不能同步
+    /// 用 token 找出是哪一台手機；停用的手機不能同步
     pub fn device_by_token(&self, token: &str) -> Result<Device> {
         self.conn
             .query_row(
@@ -302,7 +313,7 @@ impl Db {
             )
             .optional()?
             .filter(|d| !d.revoked)
-            .ok_or_else(|| anyhow!("這台手持機沒有配對，或已在電腦上停用"))
+            .ok_or_else(|| anyhow!("這台手機沒有配對，或已在電腦上停用"))
     }
 
     fn row_device(r: &rusqlite::Row) -> rusqlite::Result<Device> {
@@ -337,7 +348,7 @@ impl Db {
 
     // ---------------- 同步 ----------------
 
-    /// 手持機的一次同步：先處理上傳，再回傳電腦上的變更
+    /// 手機的一次同步：先處理上傳，再回傳電腦上的變更
     pub fn sync(&mut self, device: &Device, req: &SyncRequest) -> Result<SyncResponse> {
         let mut results = Vec::new();
         let mut product_remaps = BTreeMap::new();
@@ -359,15 +370,19 @@ impl Db {
             };
             results.push(r);
         }
+        for m in &req.shipped {
+            let at = if m.at.trim().is_empty() { now() } else { m.at.trim().to_string() };
+            self.conn.execute("UPDATE documents SET shipped_at=?2 WHERE uid=?1 AND shipped_at=''", params![m.uid, at])?;
+        }
         self.conn.execute("UPDATE devices SET last_sync_at=?1 WHERE id=?2", params![now(), device.id])?;
 
         let mut resp = self.pull(req.since_rev, device)?;
-        // 這次上傳時對應過的品項也要讓手持機知道（pull 之後才有新的 rev）
+        // 這次上傳時對應過的品項也要讓手機知道（pull 之後才有新的 rev）
         for (k, v) in product_remaps {
             resp.product_remaps.insert(k, v);
         }
         // 這次上傳的單（不論套用或衝突），一律把電腦上的最終版本送回去，
-        // 手持機才能換成正確版本（即使日期超過同步範圍、或 rev 不在 since 之後）
+        // 手機才能換成正確版本（即使日期超過同步範圍、或 rev 不在 since 之後）
         for d in &req.documents {
             if resp.documents.iter().any(|x| x.uid == d.doc.uid) {
                 continue;
@@ -559,6 +574,7 @@ impl Db {
             tax: d.tax,
             total: d.total,
             origin: d.origin,
+            shipped_at: d.shipped_at,
             rev,
             lines: d
                 .lines
@@ -597,14 +613,29 @@ impl Db {
         }
         let exists: i64 = self.conn.query_row("SELECT COUNT(*) FROM customers WHERE uid=?1", params![c.uid], |r| r.get(0))?;
         let merged: i64 = self.conn.query_row("SELECT COUNT(*) FROM merges WHERE from_uid=?1", params![c.uid], |r| r.get(0))?;
-        if exists > 0 || merged > 0 {
-            // 已經收過（重送）；手持機不能修改既有客戶
-            return Ok(res("ignored", "已存在"));
-        }
         let tax_mode = match c.tax_mode.as_str() {
             "inclusive" | "none" => c.tax_mode.as_str(),
             _ => "exclusive",
         };
+        if merged > 0 {
+            return Ok(res("ignored", "已合併到其他客戶"));
+        }
+        if exists > 0 {
+            // rev 0＝手機新增的客戶重送（已經收過）
+            if c.rev <= 0 {
+                return Ok(res("ignored", "已存在"));
+            }
+            // 手機修改既有客戶：電腦上這段時間沒改過才套用，否則以電腦為準
+            let (id, rev): (i64, i64) = self.conn.query_row("SELECT id, rev FROM customers WHERE uid=?1", params![c.uid], |r| Ok((r.get(0)?, r.get(1)?)))?;
+            if rev != c.rev {
+                return Ok(res("conflict", "電腦上也修改過這個客戶，以電腦的資料為準"));
+            }
+            self.conn.execute(
+                "UPDATE customers SET name=?1,tax_id=?2,phone=?3,contact=?4,address=?5,tax_mode=?6,note=?7 WHERE id=?8",
+                params![c.name.trim(), c.tax_id.trim(), c.phone.trim(), c.contact.trim(), c.address.trim(), tax_mode, c.note, id],
+            )?;
+            return Ok(res("applied", "已更新客戶資料"));
+        }
         self.conn.execute(
             "INSERT INTO customers(code,name,tax_id,phone,contact,address,closing_day,tax_mode,note,active,created_at,uid,origin,needs_review)
              VALUES(NULL,?1,?2,?3,?4,?5,0,?6,?7,1,?8,?9,?10,1)",
@@ -622,7 +653,7 @@ impl Db {
         if exists > 0 {
             return Ok(res("ignored", "已存在"));
         }
-        // 電腦上已有同名品項：不新增，請手持機改用電腦的品項
+        // 電腦上已有同名品項：不新增，請手機改用電腦的品項
         let same: Option<String> = self
             .conn
             .query_row("SELECT uid FROM products WHERE name=?1 ORDER BY active DESC, id LIMIT 1", params![p.name.trim()], |r| r.get(0))
@@ -735,7 +766,7 @@ impl Db {
             .optional()?;
         let handheld_issued = w.status != "draft";
 
-        // ---- 手持機刪除草稿 ----
+        // ---- 手機刪除草稿 ----
         if p.deleted {
             return match existing {
                 None => Ok(res("ignored", "電腦上已沒有這張單".into())),
@@ -744,7 +775,7 @@ impl Db {
                         self.delete_document(id)?;
                         Ok(res("applied", "已刪除".into()))
                     } else {
-                        self.add_conflict(w, device, "delete_rejected", "手持機刪除了這張草稿，但電腦上已經修改過，所以沒有刪除。", None)?;
+                        self.add_conflict(w, device, "delete_rejected", "手機刪除了這張草稿，但電腦上已經修改過，所以沒有刪除。", None)?;
                         Ok(res("conflict", "電腦上已修改，沒有刪除".into()))
                     }
                 }
@@ -756,14 +787,14 @@ impl Db {
             None => {
                 let tomb: i64 = self.conn.query_row("SELECT COUNT(*) FROM tombstones WHERE tbl='documents' AND uid=?1", params![w.uid], |r| r.get(0))?;
                 if tomb > 0 && !handheld_issued {
-                    self.add_conflict(w, device, "deleted_on_pc", "電腦上已經刪除這張草稿，但手持機又修改過。", Some(w))?;
-                    return Ok(res("conflict", "電腦上已刪除，手持機版本另存待確認".into()));
+                    self.add_conflict(w, device, "deleted_on_pc", "電腦上已經刪除這張草稿，但手機又修改過。", Some(w))?;
+                    return Ok(res("conflict", "電腦上已刪除，手機版本另存待確認".into()));
                 }
                 let doc = self.doc_from_wire(w, None, remaps)?;
                 let no = if w.doc_no.trim().is_empty() { None } else { Some(w.doc_no.trim().to_string()) };
                 let saved = self.save_document_with(&doc, &SaveOpts { doc_no: no, uid: Some(w.uid.clone()), origin: device.prefix.clone() })?;
                 if tomb > 0 {
-                    self.add_conflict(w, device, "deleted_on_pc", "電腦上刪除過這張單，但手持機已經開立並交給客戶，所以已恢復。", None)?;
+                    self.add_conflict(w, device, "deleted_on_pc", "電腦上刪除過這張單，但手機已經開立並交給客戶，所以已恢復。", None)?;
                 }
                 self.check_late_period(saved.id.unwrap(), device)?;
                 Ok(res("applied", "新單".into()))
@@ -771,19 +802,19 @@ impl Db {
             // ---- 電腦上有這張單 ----
             Some((id, rev, stmt)) => {
                 if stmt.is_some() {
-                    self.add_conflict(w, device, "locked", "這張單已列入對帳單，手持機的修改沒有套用。要套用請先作廢該對帳單。", Some(w))?;
+                    self.add_conflict(w, device, "locked", "這張單已列入對帳單，手機的修改沒有套用。要套用請先作廢該對帳單。", Some(w))?;
                     return Ok(res("conflict", "已列入對帳單".into()));
                 }
                 let pc_changed = Some(rev) != p.base_rev;
                 if pc_changed && !handheld_issued {
-                    // 兩邊都改了草稿：電腦版為準，手持機版另存讓你選
-                    self.add_conflict(w, device, "both_edited", "電腦和手持機都修改了這張草稿。目前以電腦版為準，可以改用手持機版本。", Some(w))?;
+                    // 兩邊都改了草稿：電腦版為準，手機版另存讓你選
+                    self.add_conflict(w, device, "both_edited", "電腦和手機都修改了這張草稿。目前以電腦版為準，可以改用手機版本。", Some(w))?;
                     return Ok(res("conflict", "兩邊都修改過，待電腦確認".into()));
                 }
                 if pc_changed && handheld_issued {
-                    // 手持機已開立並列印給客戶：手持機為準，電腦版另存備查
+                    // 手機已開立並列印給客戶：手機為準，電腦版另存備查
                     let pc_version = self.wire_doc(id)?;
-                    self.add_conflict(w, device, "pc_overwritten", "手持機已開立並交給客戶，以手持機版本為準；電腦上原本的修改另存在這裡。", Some(&pc_version))?;
+                    self.add_conflict(w, device, "pc_overwritten", "手機已開立並交給客戶，以手機版本為準；電腦上原本的修改另存在這裡。", Some(&pc_version))?;
                 }
                 let doc = self.doc_from_wire(w, Some(id), remaps)?;
                 self.save_document_with(&doc, &SaveOpts { doc_no: None, uid: None, origin: String::new() })?;
@@ -819,7 +850,7 @@ impl Db {
         Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
     }
 
-    /// action："use_handheld"＝改用手持機版本；"dismiss"＝保留電腦版本／知道了
+    /// action："use_handheld"＝改用手機版本；"dismiss"＝保留電腦版本／知道了
     pub fn resolve_sync_conflict(&mut self, id: i64, action: &str) -> Result<()> {
         let (kind, payload): (String, String) = self
             .conn
@@ -828,7 +859,7 @@ impl Db {
             .ok_or_else(|| anyhow!("找不到這筆提醒"))?;
         if action == "use_handheld" {
             if payload.is_empty() || !matches!(kind.as_str(), "both_edited" | "locked" | "deleted_on_pc") {
-                bail!("這筆提醒沒有可以套用的手持機版本");
+                bail!("這筆提醒沒有可以套用的手機版本");
             }
             let w: WireDoc = serde_json::from_str(&payload)?;
             let existing: Option<i64> = self.conn.query_row("SELECT id FROM documents WHERE uid=?1", params![w.uid], |r| r.get(0)).optional()?;
@@ -848,7 +879,7 @@ impl Db {
         Ok(())
     }
 
-    // ---------------- 手持機新增的客戶：確認與合併 ----------------
+    // ---------------- 手機新增的客戶：確認與合併 ----------------
 
     /// 可能重複的客戶：名稱相同，或電話相同（電話不是空白）
     pub fn possible_duplicates(&self, customer_id: i64) -> Result<Vec<(i64, String)>> {
@@ -900,7 +931,7 @@ mod tests {
     use super::*;
     use crate::models::{Customer, Product};
 
-    /// 模擬手持機：只記得 token、since_rev，以及電腦送來的資料
+    /// 模擬手機：只記得 token、since_rev，以及電腦送來的資料
     struct Handheld {
         device: Device,
         since: i64,
@@ -940,11 +971,11 @@ mod tests {
             let _ = db.pair_device("bad", "x");
         }
         assert!(db.pair_device(&code.code, "x").is_err());
-        // 作廢的配對碼從來沒有手持機用過，字頭可以再用
+        // 作廢的配對碼從來沒有手機用過，字頭可以再用
         let c2 = db.create_pairing_code().unwrap();
         let pr = db.pair_device(&c2.code, "備援機").unwrap();
         assert_eq!(pr.prefix, "V2");
-        // 停用的手持機不能同步，而且它的字頭不再重複使用（它開過的單號才不會撞到）
+        // 停用的手機不能同步，而且它的字頭不再重複使用（它開過的單號才不會撞到）
         let d = db.device_by_token(&pr.token).unwrap();
         db.revoke_device(d.id).unwrap();
         assert!(db.device_by_token(&pr.token).is_err());
@@ -1003,7 +1034,7 @@ mod tests {
         let req = SyncRequest { customers: vec![new_cust.clone()], products: vec![new_prod.clone()], documents: vec![PushDoc { doc: doc.clone(), base_rev: None, deleted: false }], ..Default::default() };
         let r = sync(&mut db, &mut h, req.clone());
         assert!(r.results.iter().all(|x| x.status == "applied"), "{:?}", r.results);
-        // 電腦上：客戶待確認、單號照手持機、金額由電腦重算（內含稅）
+        // 電腦上：客戶待確認、單號照手機、金額由電腦重算（內含稅）
         let c = db.list_customers(true).unwrap().into_iter().find(|c| c.name == "海港小館").unwrap();
         assert!(c.needs_review);
         assert_eq!(c.origin, "V1");
@@ -1020,7 +1051,7 @@ mod tests {
         assert_eq!(db.list_customers(true).unwrap().len(), 2);
         assert_eq!(db.list_products(true).unwrap().len(), 2);
         assert_eq!(db.list_documents(&Default::default()).unwrap().len(), 1);
-        // 單號已用到 0001，手持機重裝後也知道
+        // 單號已用到 0001，手機重裝後也知道
         assert_eq!(again.prefix_last_seq.get("202610"), Some(&1));
     }
 
@@ -1050,7 +1081,7 @@ mod tests {
         let r = sync(&mut db, &mut h, SyncRequest::default());
         let mut w = r.documents.iter().find(|d| d.uid == draft.uid).unwrap().clone();
         let base = w.rev;
-        // 手持機補上價格、開立
+        // 手機補上價格、開立
         w.lines[0].price = 400.0;
         w.status = "issued".into();
         let r2 = sync(&mut db, &mut h, SyncRequest { documents: vec![PushDoc { doc: w, base_rev: Some(base), deleted: false }], ..Default::default() });
@@ -1058,7 +1089,7 @@ mod tests {
         let d = db.get_document(draft.id.unwrap()).unwrap();
         assert_eq!((d.status.as_str(), d.doc_no.as_str(), d.subtotal), ("issued", draft.doc_no.as_str(), 1200), "沿用電腦的 S 單號");
         assert!(db.list_sync_conflicts(false).unwrap().is_empty());
-        // 手持機收到更新後的版本
+        // 手機收到更新後的版本
         assert!(r2.documents.iter().any(|x| x.uid == draft.uid && x.status == "issued"));
     }
 
@@ -1078,10 +1109,10 @@ mod tests {
             x.lines[0].qty_text = "4".into();
             db.save_document(&x).unwrap();
         }
-        // A：手持機也只是改草稿 → 電腦版為準，手持機版另存
+        // A：手機也只是改草稿 → 電腦版為準，手機版另存
         let mut ha = wa.clone();
         ha.lines[0].price = 390.0;
-        // B：手持機已開立並列印 → 手持機為準，電腦版另存
+        // B：手機已開立並列印 → 手機為準，電腦版另存
         let mut hb = wb.clone();
         hb.lines[0].price = 400.0;
         hb.status = "issued".into();
@@ -1091,17 +1122,17 @@ mod tests {
         ], ..Default::default() });
         assert_eq!(r2.results[0].status, "conflict");
         assert_eq!(r2.results[1].status, "applied");
-        // 兩張單的電腦最終版本都有送回手持機
+        // 兩張單的電腦最終版本都有送回手機
         assert!(r2.documents.iter().any(|d| d.uid == a.uid && d.lines[0].qty_text == "4"));
         assert!(r2.documents.iter().any(|d| d.uid == b.uid && d.status == "issued"));
         let da = db.get_document(a.id.unwrap()).unwrap();
         assert_eq!((da.lines[0].qty_text.as_str(), da.lines[0].price), ("4", 0.0), "A 維持電腦版");
         let dbb = db.get_document(b.id.unwrap()).unwrap();
-        assert_eq!((dbb.status.as_str(), dbb.lines[0].qty_text.as_str(), dbb.lines[0].price), ("issued", "3", 400.0), "B 用手持機版");
+        assert_eq!((dbb.status.as_str(), dbb.lines[0].qty_text.as_str(), dbb.lines[0].price), ("issued", "3", 400.0), "B 用手機版");
         let cs = db.list_sync_conflicts(false).unwrap();
         let kinds: Vec<&str> = cs.iter().map(|c| c.kind.as_str()).collect();
         assert!(kinds.contains(&"both_edited") && kinds.contains(&"pc_overwritten"), "{:?}", kinds);
-        // 在電腦上選「改用手持機版本」
+        // 在電腦上選「改用手機版本」
         let ca = cs.iter().find(|c| c.kind == "both_edited").unwrap();
         assert!(ca.can_use_handheld);
         db.resolve_sync_conflict(ca.id, "use_handheld").unwrap();
@@ -1123,13 +1154,13 @@ mod tests {
         let w = db.wire_doc(issued.id.unwrap()).unwrap();
         // 電腦上建 9 月對帳單 → 這張單鎖定
         db.create_statement(cid, "2026-09-01", "2026-09-30", "summary", "").unwrap();
-        // 手持機改這張單 → 不套用
+        // 手機改這張單 → 不套用
         let mut hw = w.clone();
         hw.lines[0].price = 1.0;
         let r2 = sync(&mut db, &mut h, SyncRequest { documents: vec![PushDoc { doc: hw, base_rev: Some(w.rev), deleted: false }], ..Default::default() });
         assert_eq!(r2.results[0].status, "conflict");
         assert_eq!(db.get_document(issued.id.unwrap()).unwrap().lines[0].price, 380.0);
-        // 手持機離線很久，現在才上傳一張 9 月的單 → 收下，但提醒沒列入 9 月對帳單
+        // 手機離線很久，現在才上傳一張 9 月的單 → 收下，但提醒沒列入 9 月對帳單
         let late = WireDoc { uid: "late".into(), doc_no: "V1-202609-0001".into(), customer_uid: cust_uid, doc_date: "2026-09-20".into(), status: "issued".into(),
             lines: vec![line(None, "透抽", "1", 300.0)], ..Default::default() };
         let r3 = sync(&mut db, &mut h, SyncRequest { documents: vec![PushDoc { doc: late, base_rev: None, deleted: false }], ..Default::default() });
@@ -1168,7 +1199,7 @@ mod tests {
     fn merge_handheld_customer() {
         let (mut db, mut h, cid, _pid) = setup();
         sync(&mut db, &mut h, SyncRequest::default());
-        // 手持機又新增了一次「時光樹影吧檯」（電話一樣）
+        // 手機又新增了一次「時光樹影吧檯」（電話一樣）
         let dup = WireCustomer { uid: "hh-dup-cust".into(), name: "時光樹影".into(), phone: "0227110000".into(), ..Default::default() };
         let d1 = WireDoc { uid: "m1".into(), doc_no: "V1-202610-0003".into(), customer_uid: "hh-dup-cust".into(), doc_date: "2026-10-25".into(), status: "issued".into(),
             lines: vec![line(None, "白蝦（大）", "1", 380.0)], ..Default::default() };
@@ -1181,12 +1212,12 @@ mod tests {
         assert_eq!(db.list_customers(true).unwrap().len(), 1);
         let docs = db.list_documents(&Default::default()).unwrap();
         assert!(docs.iter().all(|d| d.customer_id == cid));
-        // 手持機收到：重複客戶刪除、合併對照、單據改指向原客戶
+        // 手機收到：重複客戶刪除、合併對照、單據改指向原客戶
         let r = sync(&mut db, &mut h, SyncRequest::default());
         assert!(r.deleted.contains(&Deleted { tbl: "customers".into(), uid: "hh-dup-cust".into() }));
         let cust_uid = db.get_customer(cid).unwrap().uid;
         assert_eq!(r.customer_merges.get("hh-dup-cust"), Some(&cust_uid));
-        // 手持機合併前還離線開了一張指向舊客戶的單 → 自動歸到原客戶
+        // 手機合併前還離線開了一張指向舊客戶的單 → 自動歸到原客戶
         let d2 = WireDoc { uid: "m2".into(), doc_no: "V1-202610-0004".into(), customer_uid: "hh-dup-cust".into(), doc_date: "2026-10-25".into(), status: "issued".into(),
             lines: vec![line(None, "白蝦（大）", "1", 380.0)], ..Default::default() };
         let r2 = sync(&mut db, &mut h, SyncRequest { documents: vec![PushDoc { doc: d2, base_rev: None, deleted: false }], ..Default::default() });
@@ -1203,5 +1234,75 @@ mod tests {
         c.code = "C009".into();
         db.save_customer(&c).unwrap();
         assert!(!db.get_customer(c.id.unwrap()).unwrap().needs_review, "電腦上編輯存檔就算確認過");
+    }
+    #[test]
+    fn phone_prints_pc_issued_doc_and_edits_customer() {
+        let (mut db, mut h, cid, _pid) = setup();
+        let today = Local::now().format("%Y-%m-%d").to_string();
+        // 電腦上在家開好、已開立的單 → 手機看得到，還沒出貨
+        let issued = db.save_document(&Document { customer_id: cid, doc_date: today.clone(), status: "issued".into(),
+            lines: vec![DocLine { name: "白蝦（大）".into(), unit: "斤".into(), qty_text: "2".into(), price: 380.0, ..Default::default() }], ..Default::default() }).unwrap();
+        let r = sync(&mut db, &mut h, SyncRequest::default());
+        let w = r.documents.iter().find(|d| d.uid == issued.uid).expect("已開立的單也送到手機");
+        assert_eq!(w.shipped_at, "");
+        // 手機列印給客戶 → 記錄出貨時間，電腦看得到，單據內容不變
+        let r2 = sync(&mut db, &mut h, SyncRequest { shipped: vec![ShippedMark { uid: issued.uid.clone(), at: "2026-10-26 09:12:00".into() }], ..Default::default() });
+        let back = r2.documents.iter().find(|d| d.uid == issued.uid).expect("出貨時間改了要送回手機");
+        assert_eq!(back.shipped_at, "2026-10-26 09:12:00");
+        let pc = db.get_document(issued.id.unwrap()).unwrap();
+        assert_eq!(pc.shipped_at, "2026-10-26 09:12:00");
+        assert_eq!(pc.total, issued.total);
+        // 再送一次不會覆蓋第一次的出貨時間
+        sync(&mut db, &mut h, SyncRequest { shipped: vec![ShippedMark { uid: issued.uid.clone(), at: "2026-10-27 10:00:00".into() }], ..Default::default() });
+        assert_eq!(db.get_document(issued.id.unwrap()).unwrap().shipped_at, "2026-10-26 09:12:00");
+        // 手機核對時改了數量（電腦沒動過）→ 套用
+        let mut mine = back.clone();
+        mine.lines[0].qty_text = "2斤8兩".into();
+        let base = mine.rev;
+        let r3 = sync(&mut db, &mut h, SyncRequest { documents: vec![PushDoc { doc: mine, base_rev: Some(base), deleted: false }], ..Default::default() });
+        assert_eq!(r3.results[0].status, "applied");
+        assert_eq!(db.get_document(issued.id.unwrap()).unwrap().lines[0].qty_text, "2斤8兩");
+
+        // 手機修改客戶資料
+        let cust = r.customers[0].clone();
+        let mut edited = cust.clone();
+        edited.phone = "0912-345-678".into();
+        edited.tax_id = "12345678".into();
+        let r4 = sync(&mut db, &mut h, SyncRequest { customers: vec![edited.clone()], ..Default::default() });
+        assert_eq!(r4.results[0].status, "applied");
+        let c = db.get_customer(cid).unwrap();
+        assert_eq!((c.phone.as_str(), c.tax_id.as_str()), ("0912-345-678", "12345678"));
+        assert_eq!(c.code, "C001", "代號、結帳日只能在電腦改");
+        // 拿舊的版本再改一次（電腦已經是新版）→ 以電腦為準
+        edited.phone = "舊版本".into();
+        let r5 = sync(&mut db, &mut h, SyncRequest { customers: vec![edited], ..Default::default() });
+        assert_eq!(r5.results[0].status, "conflict");
+        assert_eq!(db.get_customer(cid).unwrap().phone, "0912-345-678");
+    }
+
+    #[test]
+    fn delete_customer_and_product() {
+        let (mut db, mut h, cid, pid) = setup();
+        sync(&mut db, &mut h, SyncRequest::default());
+        // 沒用過的直接刪除，手機收到刪除通知
+        let c2 = db.save_customer(&Customer { name: "打錯的客戶".into(), tax_mode: "exclusive".into(), active: true, ..Default::default() }).unwrap();
+        let c2uid = db.get_customer(c2).unwrap().uid;
+        let p2 = db.save_product(&Product { name: "打錯的品項".into(), active: true, ..Default::default() }).unwrap();
+        db.set_customer_price(c2, pid, Some(300.0)).unwrap();
+        sync(&mut db, &mut h, SyncRequest::default());
+        assert_eq!(db.delete_customer(c2).unwrap(), "deleted");
+        assert_eq!(db.delete_product(p2).unwrap(), "deleted");
+        let r = sync(&mut db, &mut h, SyncRequest::default());
+        assert!(r.deleted.iter().any(|d| d.tbl == "customers" && d.uid == c2uid));
+        assert!(r.deleted.iter().any(|d| d.tbl == "products"));
+        // 出貨單用過的改成停用，舊單據不受影響
+        let doc = db.save_document(&Document { customer_id: cid, doc_date: "2026-10-25".into(), status: "issued".into(),
+            lines: vec![DocLine { product_id: Some(pid), name: "白蝦（大）".into(), unit: "斤".into(), qty_text: "1".into(), price: 380.0, ..Default::default() }], ..Default::default() }).unwrap();
+        assert_eq!(db.delete_customer(cid).unwrap(), "deactivated");
+        assert_eq!(db.delete_product(pid).unwrap(), "deactivated");
+        assert!(!db.get_customer(cid).unwrap().active);
+        assert_eq!(db.get_document(doc.id.unwrap()).unwrap().cust_name, "時光樹影吧檯");
+        let r2 = sync(&mut db, &mut h, SyncRequest::default());
+        assert!(r2.customers.iter().any(|c| c.uid == db.get_customer(cid).unwrap().uid && !c.active));
     }
 }

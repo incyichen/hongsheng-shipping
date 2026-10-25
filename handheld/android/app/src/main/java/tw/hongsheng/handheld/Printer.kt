@@ -23,7 +23,7 @@ import java.util.concurrent.TimeUnit
 
 /**
  * 熱感印表機。畫面傳來的是 384 點寬的單據圖片。
- *  - auto：優先用商米內建印表機服務；沒有的話改用藍牙「InnerPrinter」。
+ *  - auto：有商米內建印表機服務就用它；一般手機用已配對的藍牙印表機（例如 Zebra ZR128）。
  *  - bt:XX:XX:...：指定的藍牙熱感印表機（ESC/POS 點陣圖）。
  */
 class Printer(private val ctx: Context) {
@@ -74,10 +74,19 @@ class Printer(private val ctx: Context) {
         if (target.startsWith("bt:")) { printBluetooth(bmp, target.removePrefix("bt:")); return }
         val s = sunmi
         if (s != null) { printSunmi(s, bmp); return }
-        // 沒有商米服務：找配對清單裡的 InnerPrinter（商米手持機內建的虛擬藍牙印表機）
-        val inner = try { bondedDevices().firstOrNull { it.first.contains("InnerPrinter", ignoreCase = true) } } catch (_: Exception) { null }
-            ?: throw Exception(if (sunmiError.isNotEmpty()) sunmiError else "找不到印表機，請到設定選擇印表機")
-        printBluetooth(bmp, inner.second)
+        // 一般手機：用已配對的藍牙印表機
+        val bonded = try { bondedDevices() } catch (e: SecurityException) {
+            throw Exception("沒有藍牙權限（請在系統設定允許「附近的裝置」）")
+        }
+        val printerLike = Regex("InnerPrinter|Zebra|ZR\\d|ZQ\\d|print|POS|MTP|XP-|RPP", RegexOption.IGNORE_CASE)
+        val pick = bonded.firstOrNull { it.first.contains("InnerPrinter", ignoreCase = true) }
+            ?: bonded.singleOrNull()
+            ?: bonded.filter { printerLike.containsMatchIn(it.first) }.singleOrNull()
+            ?: throw Exception(
+                if (bonded.isEmpty()) "找不到印表機：請先到手機的「設定 → 藍牙」配對印表機"
+                else "配對了好幾台藍牙裝置，請到 App 的「設定 → 印表機」選擇要用的印表機"
+            )
+        printBluetooth(bmp, pick.second)
     }
 
     // 商米印表機狀態碼

@@ -1,8 +1,8 @@
-//! 同步服務：手持機透過 Tailscale 或區域網路連到電腦上的這個小型網頁服務。
+//! 同步服務：手機透過 Tailscale 或區域網路連到電腦上的這個小型網頁服務。
 //!
 //! - `GET  /api/ping`  測試連線（不需配對）
 //! - `POST /api/pair`  輸入電腦上產生的配對碼，取得之後同步用的 token
-//! - `POST /api/sync`  上傳手持機的變更並取回電腦的變更（標頭帶 `Authorization: Bearer <token>`）
+//! - `POST /api/sync`  上傳手機的變更並取回電腦的變更（標頭帶 `Authorization: Bearer <token>`）
 
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
@@ -136,7 +136,7 @@ fn handle(db: &SharedDb, mut req: Request) {
                     Ok(mut guard) => match guard.as_mut() {
                         None => error(503, "電腦上的資料庫沒有開啟"),
                         Some(d) => match token.as_deref().map(|t| d.device_by_token(t)) {
-                            None => error(401, "缺少手持機憑證，請重新配對"),
+                            None => error(401, "缺少手機憑證，請重新配對"),
                             Some(Err(e)) => error(401, format!("{:#}", e)),
                             Some(Ok(device)) => match d.sync(&device, &body) {
                                 Ok(r) => json_response(200, &r),
@@ -181,7 +181,7 @@ mod tests {
         }
     }
 
-    /// 模擬手持機走完整個流程：測試連線 → 配對 → 第一次同步 → 離線開單後上傳
+    /// 模擬手機走完整個流程：測試連線 → 配對 → 第一次同步 → 離線開單後上傳
     #[test]
     fn handheld_over_http() {
         let (mut srv, shared, base) = start();
@@ -200,7 +200,7 @@ mod tests {
         let (code, _) = post(&format!("{}/api/pair", base), None, json!({"code": "123", "device_name": "x"}));
         assert_eq!(code, 403);
 
-        // 電腦上產生配對碼，手持機輸入
+        // 電腦上產生配對碼，手機輸入
         let pc = shared.lock().unwrap().as_ref().unwrap().create_pairing_code().unwrap();
         let (code, body) = post(&format!("{}/api/pair", base), None, json!({"code": pc.code, "device_name": "V3 測試機"}));
         assert_eq!(code, 200, "{}", body);
@@ -238,7 +238,7 @@ mod tests {
         assert_eq!(second.documents.len(), 1);
         assert_eq!(second.documents[0].total, 923, "電腦重算：879 + 稅 44");
 
-        // 在電腦上停用這台手持機 → 不能再同步
+        // 在電腦上停用這台手機 → 不能再同步
         {
             let g = shared.lock().unwrap();
             let d = g.as_ref().unwrap();

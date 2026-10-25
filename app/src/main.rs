@@ -7,7 +7,18 @@ mod storage;
 
 use commands::AppState;
 use std::sync::{Arc, Mutex};
-use tauri::Manager;
+use tauri::menu::{Menu, MenuItem};
+use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+use tauri::{AppHandle, Manager, WindowEvent};
+
+/// 把主視窗叫到前面（從右下角常駐、或重複開啟 exe 時）
+fn show_main(app: &AppHandle) {
+    if let Some(w) = app.get_webview_window("main") {
+        let _ = w.show();
+        let _ = w.unminimize();
+        let _ = w.set_focus();
+    }
+}
 
 fn main() {
     let data_dir = storage::pick_data_dir();
@@ -20,13 +31,15 @@ fn main() {
     };
 
     tauri::Builder::default()
-        // 只允許開一個視窗，重複開啟時把原本的視窗叫到前面
-        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-            if let Some(w) = app.get_webview_window("main") {
-                let _ = w.unminimize();
-                let _ = w.set_focus();
+        // 只允許開一個，重複開啟 exe 時把常駐中的那一個叫出來
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| show_main(app)))
+        // 按視窗的 ✕ 不結束程式，縮到右下角繼續提供手機同步
+        .on_window_event(|window, event| {
+            if let WindowEvent::CloseRequested { api, .. } = event {
+                api.prevent_close();
+                let _ = window.hide();
             }
-        }))
+        })
         .manage(AppState {
             db: Arc::new(Mutex::new(db)),
             data_dir,
@@ -35,8 +48,31 @@ fn main() {
             sync_error: Mutex::new(None),
         })
         .setup(|app| {
-            // 啟動手持機同步服務（設定裡可以關閉或改連接埠）
+            // 啟動手機同步服務（設定裡可以關閉或改連接埠）
             commands::start_sync_server(&app.state::<AppState>());
+
+            // 右下角常駐圖示：左鍵開啟，右鍵選單「開啟／結束程式」
+            let open = MenuItem::with_id(app, "open", "開啟出貨系統", true, None::<&str>)?;
+            let quit = MenuItem::with_id(app, "quit", "結束程式（手機將無法同步）", true, None::<&str>)?;
+            let menu = Menu::with_items(app, &[&open, &quit])?;
+            let mut tray = TrayIconBuilder::with_id("main")
+                .tooltip("泓昇出貨系統（手機同步中）")
+                .menu(&menu)
+                .show_menu_on_left_click(false)
+                .on_menu_event(|app, e| match e.id().as_ref() {
+                    "open" => show_main(app),
+                    "quit" => app.exit(0),
+                    _ => {}
+                })
+                .on_tray_icon_event(|tray, e| {
+                    if let TrayIconEvent::Click { button: MouseButton::Left, button_state: MouseButtonState::Up, .. } = e {
+                        show_main(tray.app_handle());
+                    }
+                });
+            if let Some(icon) = app.default_window_icon() {
+                tray = tray.icon(icon.clone());
+            }
+            tray.build(app)?;
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -47,6 +83,8 @@ fn main() {
             commands::check_text,
             commands::list_customers,
             commands::save_customer,
+            commands::delete_customer,
+            commands::delete_product,
             commands::customer_balances,
             commands::list_products,
             commands::save_product,

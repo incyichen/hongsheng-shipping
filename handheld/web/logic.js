@@ -1,4 +1,4 @@
-/* 手持機：資料與同步邏輯（不碰畫面）
+/* 手機：資料與同步邏輯（不碰畫面）
  * 在 Android 上由原生外殼提供 Native（存檔、網路、列印）；測試時可用替身。
  * 計算規則跟電腦版（core/src/util.rs）一致：每列金額四捨五入到元，稅金依客戶稅別。
  */
@@ -75,7 +75,7 @@
       version: 1,
       config: { server: '', token: '', prefix: '', deviceName: '', companyName: '泓昇海鮮', maker: '', printer: 'auto' },
       since: 0,
-      customers: {},        // uid → WireCustomer（含手持機新增、尚未上傳的）
+      customers: {},        // uid → WireCustomer（含手機新增、尚未上傳的）
       products: {},         // uid → WireProduct
       customerPrices: [],   // 客戶專屬價
       lastPrices: [],       // 上次成交價
@@ -83,6 +83,7 @@
       pendingCustomers: {}, // uid → true：還沒上傳的新客戶
       pendingProducts: {},  // uid → true：還沒上傳的新品項
       merges: {},           // 舊客戶 uid → 新客戶 uid
+      shipped: {},          // uid → 時間：手機已列印給客戶、還沒告訴電腦的單
       seq: {},              // 年月 → 已用到的流水號
       lastSyncAt: '',
       lastSyncError: '',
@@ -100,10 +101,28 @@
   const productList = (state) => Object.values(state.products).filter((p) => p.active !== false)
     .sort((a, b) => (a.code || 'zzzz').localeCompare(b.code || 'zzzz') || a.name.localeCompare(b.name));
 
-  function addCustomer(state, { name, phone, address, tax_mode, note }) {
+  // 修改既有客戶（代號、結帳日只能在電腦改）。同步時電腦上沒改過才套用，否則以電腦為準
+  function updateCustomer(state, uid, f) {
+    const c = state.customers[uid];
+    if (!c) throw new Error('找不到這個客戶');
+    const name = String(f.name ?? c.name).trim();
+    if (!name) throw new Error('客戶名稱不可空白');
+    Object.assign(c, {
+      name,
+      phone: String(f.phone ?? c.phone ?? '').trim(),
+      address: String(f.address ?? c.address ?? '').trim(),
+      tax_id: String(f.tax_id ?? c.tax_id ?? '').trim(),
+      note: String(f.note ?? c.note ?? ''),
+      tax_mode: ['exclusive', 'inclusive', 'none'].includes(f.tax_mode) ? f.tax_mode : c.tax_mode,
+    });
+    state.pendingCustomers[uid] = true;
+    return c;
+  }
+
+  function addCustomer(state, { name, phone, address, tax_mode, note, tax_id }) {
     name = String(name || '').trim();
     if (!name) throw new Error('客戶名稱不可空白');
-    const c = { uid: newUid(), code: '', name, tax_id: '', phone: String(phone || '').trim(), contact: '', address: String(address || '').trim(),
+    const c = { uid: newUid(), code: '', name, tax_id: String(tax_id || '').trim(), phone: String(phone || '').trim(), contact: '', address: String(address || '').trim(),
       closing_day: 0, tax_mode: ['inclusive', 'none'].includes(tax_mode) ? tax_mode : 'exclusive', note: String(note || ''), active: true,
       origin: state.config.prefix, needs_review: true, rev: 0 };
     state.customers[c.uid] = c;
@@ -158,7 +177,7 @@
     return { uid: newUid(), doc_no: '', kind: 'shipment', customer_uid: customerUid, doc_date: today(), maker: state.config.maker || '',
       note: '', status: 'draft', locked: false, statement_no: null, cust_name: c ? c.name : '', cust_phone: c ? c.phone : '',
       cust_address: c ? c.address : '', tax_mode: c ? c.tax_mode : 'exclusive', subtotal: 0, tax: 0, total: 0,
-      origin: state.config.prefix, rev: 0, lines: [] };
+      origin: state.config.prefix, shipped_at: '', rev: 0, lines: [] };
   }
 
   // 依目前的客戶稅別重算金額（電腦收到後也會用同樣規則重算）
@@ -212,24 +231,40 @@
   function deleteDoc(state, uid) {
     const r = state.docs[uid];
     if (!r) return;
-    if (r.doc.status === 'issued' && r.base_rev !== null) throw new Error('已開立並同步的單不能在手持機刪除，請在電腦上處理');
+    if (r.doc.status === 'issued' && r.base_rev !== null) throw new Error('已開立並同步的單不能在手機刪除，請在電腦上處理');
     if (r.base_rev === null && r.doc.status === 'draft') { delete state.docs[uid]; return; } // 從沒上傳過，直接刪
     r.deleted = true; r.dirty = true;
   }
 
-  const canEdit = (r) => !r.doc.locked && !(r.doc.status === 'issued' && !r.dirty && r.base_rev !== null);
+  // 已列入對帳單的單不能改；其他（包含電腦開好的已開立單）都可以在手機核對修改
+  const canEdit = (r) => !r.doc.locked;
+  // 從沒上傳過的草稿或手機剛開的單才能刪；電腦上已有的已開立單要在電腦處理
+  const canDelete = (r) => !r.doc.locked && !(r.doc.status === 'issued' && r.base_rev !== null);
+
+  // 列印給客戶＝出貨。只記第一次的時間
+  function markShipped(state, uid) {
+    const r = state.docs[uid];
+    state.shipped = state.shipped || {};
+    if (!r || r.doc.shipped_at) return;
+    const at = nowText();
+    r.doc.shipped_at = at;
+    state.shipped[uid] = at;
+  }
 
   function pendingCount(state) {
-    return Object.keys(state.pendingCustomers).length + Object.values(state.docs).filter((r) => r.dirty).length;
+    return Object.keys(state.pendingCustomers).length + Object.values(state.docs).filter((r) => r.dirty).length +
+      Object.keys(state.shipped || {}).filter((u) => !(state.docs[u] && state.docs[u].dirty)).length;
   }
 
   // ---------------- 同步 ----------------
   function buildRequest(state) {
+    state.shipped = state.shipped || {};
     return {
       since_rev: state.since,
       customers: Object.keys(state.pendingCustomers).map((u) => state.customers[u]).filter(Boolean),
       products: Object.keys(state.pendingProducts).map((u) => state.products[u]).filter(Boolean),
       documents: Object.values(state.docs).filter((r) => r.dirty).map((r) => ({ doc: r.doc, base_rev: r.base_rev, deleted: !!r.deleted })),
+      shipped: Object.entries(state.shipped || {}).map(([uid, at]) => ({ uid, at })),
     };
   }
 
@@ -244,10 +279,15 @@
     }
     for (const c of sent.customers) {
       const r = results[c.uid];
-      if (r && r.status !== 'rejected') delete state.pendingCustomers[c.uid];
-      else if (r) summary.rejected.push(`${c.name}：${r.message}`);
+      if (!r) continue;
+      // 同步中又修改過，就留到下次再送
+      const changed = JSON.stringify(state.customers[c.uid]) !== JSON.stringify(c);
+      if (r.status === 'rejected') summary.rejected.push(`${c.name}：${r.message}`);
+      else if (!changed) delete state.pendingCustomers[c.uid];
+      if (r.status === 'conflict') summary.conflicts.push(`客戶「${c.name}」：${r.message}`);
     }
-    // 送出的單：成功或衝突都以電腦回傳的版本為準；被拒絕的保留在手持機、顯示原因
+    for (const m of sent.shipped || []) if (state.shipped[m.uid] === m.at) delete state.shipped[m.uid];
+    // 送出的單：成功或衝突都以電腦回傳的版本為準；被拒絕的保留在手機、顯示原因
     for (const pd of sent.documents) {
       const r = results[pd.doc.uid];
       const rec = state.docs[pd.doc.uid];
@@ -261,7 +301,7 @@
     }
 
     // 品項對應（要在比對「同步中是否又修改過」之後才做，不然會被誤判成有修改）
-    // 手持機新增的品項在電腦上已有同名 → 改用電腦的品項
+    // 手機新增的品項在電腦上已有同名 → 改用電腦的品項
     for (const [from, to] of Object.entries(resp.product_remaps || {})) {
       for (const r of Object.values(state.docs)) for (const l of r.doc.lines) if (l.product_uid === from) l.product_uid = to;
       delete state.products[from];
@@ -279,7 +319,8 @@
     for (const p of resp.products || []) { if (!state.pendingProducts[p.uid]) state.products[p.uid] = p; summary.received++; }
     for (const d of resp.documents || []) {
       const rec = state.docs[d.uid];
-      if (rec && rec.dirty) continue; // 手持機上還有沒送出的修改：保留，下次上傳時由電腦判斷
+      if (rec && rec.dirty) continue; // 手機上還有沒送出的修改：保留，下次上傳時由電腦判斷
+      if (!d.shipped_at && state.shipped[d.uid]) d.shipped_at = state.shipped[d.uid]; // 剛印、還沒告訴電腦
       state.docs[d.uid] = { doc: d, base_rev: d.rev, dirty: false, deleted: false, error: '' };
       summary.received++;
     }
@@ -302,11 +343,11 @@
     return summary;
   }
 
-  // 已同步、已開立、超過 60 天的單從手持機移除（電腦上都還在）
+  // 已同步、已開立、超過 60 天的單從手機移除（電腦上都還在）
   function prune(state, days = 60) {
     const d = new Date(); d.setDate(d.getDate() - days);
     const cutoff = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
-    for (const [u, r] of Object.entries(state.docs)) if (!r.dirty && r.doc.status === 'issued' && r.doc.doc_date < cutoff) delete state.docs[u];
+    for (const [u, r] of Object.entries(state.docs)) if (!r.dirty && !state.shipped[u] && r.doc.status === 'issued' && r.doc.doc_date < cutoff) delete state.docs[u];
   }
 
   function baseUrl(server) {
@@ -340,13 +381,13 @@
       throw new Error(state.lastSyncError);
     }
     const body = r.body ? JSON.parse(r.body) : {};
-    if (r.status === 401) { state.lastSyncError = body.error || '手持機已被停用或需要重新配對'; throw new Error(state.lastSyncError); }
+    if (r.status === 401) { state.lastSyncError = body.error || '手機已被停用或需要重新配對'; throw new Error(state.lastSyncError); }
     if (r.status !== 200) { state.lastSyncError = body.error || `同步失敗（${r.status}）`; throw new Error(state.lastSyncError); }
     return applyResponse(state, body, sent);
   }
 
   const api = { pad2, today, nowText, newUid, fmtInt, fmtNum, parseNum, parseQty, lineAmount, totalsFromSum, TAX_LABEL,
-    emptyState, resolveCustomer, customerList, productList, addCustomer, ensureProduct, suggestPrice, nextDocNo, newDoc,
+    emptyState, resolveCustomer, customerList, productList, addCustomer, updateCustomer, canDelete, markShipped, ensureProduct, suggestPrice, nextDocNo, newDoc,
     recalc, validate, saveDoc, deleteDoc, canEdit, pendingCount, buildRequest, applyResponse, prune, baseUrl, pair, sync };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.HH = api;

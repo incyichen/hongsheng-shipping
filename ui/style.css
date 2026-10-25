@@ -195,6 +195,7 @@ table.lines .c-del { width: 44px; }
 
 /* ---------- 手持機同步 ---------- */
 .badge.hh { background: #E8E4F6; color: #4B3C8F; }
+.badge.shipped { background: #E2F2E6; color: #1F6B3A; }
 .badge.review { background: #FFF4D6; color: #7A5300; }
 .nav-count { display: inline-block; min-width: 20px; padding: 0 6px; margin-left: 6px; border-radius: 99px; background: #E0A526; color: #16242C; font-size: 12px; font-weight: 700; text-align: center; }
 .pair-code { font-size: 44px; font-weight: 700; letter-spacing: 10px; text-align: center; font-variant-numeric: tabular-nums; padding: 14px; border: 2px dashed var(--accent); border-radius: 12px; color: var(--accent-dark); }

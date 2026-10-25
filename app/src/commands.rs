@@ -20,7 +20,7 @@ pub struct AppState {
     pub sync_error: Mutex<Option<String>>,
 }
 
-/// 依設定啟動（或重新啟動）手持機同步服務
+/// 依設定啟動（或重新啟動）手機同步服務
 pub fn start_sync_server(state: &AppState) {
     let settings = state.db.lock().ok().and_then(|g| g.as_ref().and_then(|d| d.get_settings().ok()));
     let mut slot = state.sync_server.lock().unwrap();
@@ -117,6 +117,16 @@ pub fn list_customers(state: State<'_, AppState>, include_inactive: bool) -> R<V
 #[tauri::command]
 pub fn save_customer(state: State<'_, AppState>, customer: Customer) -> R<i64> {
     with_db(&state, |db| db.save_customer(&customer))
+}
+
+#[tauri::command]
+pub fn delete_customer(state: State<'_, AppState>, id: i64) -> R<String> {
+    with_db(&state, |db| db.delete_customer(id))
+}
+
+#[tauri::command]
+pub fn delete_product(state: State<'_, AppState>, id: i64) -> R<String> {
+    with_db(&state, |db| db.delete_product(id))
 }
 
 #[tauri::command]
@@ -346,7 +356,7 @@ pub fn backup_now(state: State<'_, AppState>) -> R<String> {
 }
 
 
-// ---------- 手持機同步 ----------
+// ---------- 手機同步 ----------
 
 #[derive(Serialize)]
 pub struct SyncAddress {

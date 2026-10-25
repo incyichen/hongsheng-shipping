@@ -12,10 +12,10 @@
 <section class="view" id="v-setup">
   <header class="bar"><h1>連線到電腦</h1></header>
   <div class="page">
-    <p class="lead">在電腦的出貨系統按「設定 → 手持機同步 → 新增手持機」，把畫面上的位址和配對碼輸入這裡。</p>
+    <p class="lead">在電腦的出貨系統按「設定 → 手機同步 → 新增手機」，把畫面上的位址和配對碼輸入這裡。</p>
     <label class="field"><span>電腦位址</span><input id="su-server" inputmode="url" autocomplete="off" placeholder="例如 100.101.102.103"></label>
     <label class="field"><span>配對碼（6 位數）</span><input id="su-code" inputmode="numeric" maxlength="6" autocomplete="off" class="big-num"></label>
-    <label class="field"><span>這台手持機的名稱</span><input id="su-name" autocomplete="off"></label>
+    <label class="field"><span>這台手機的名稱</span><input id="su-name" autocomplete="off"></label>
     <p class="error" id="su-error"></p>
     <button type="button" class="btn primary block" id="su-pair">配對並下載資料</button>
   </div>
@@ -28,8 +28,27 @@
     <button type="button" class="bar-btn" id="home-settings" aria-label="設定">設定</button>
   </header>
   <button type="button" class="sync-chip" id="sync-chip"></button>
-  <div class="page with-fab" id="home-list"></div>
-  <button type="button" class="fab" id="home-new">＋ 開新出貨單</button>
+  <div class="page with-fab with-tabs" id="home-list"></div>
+  <button type="button" class="fab above-tabs" id="home-new">＋ 開新出貨單</button>
+  <nav class="tabbar" aria-label="主選單">
+    <button type="button" data-tab="v-home" aria-current="page"><span class="ti">▤</span>出貨單</button>
+    <button type="button" data-tab="v-clients"><span class="ti">☺</span>客戶</button>
+  </nav>
+</section>
+
+<!-- 客戶（下方工具列） -->
+<section class="view" id="v-clients">
+  <header class="bar">
+    <h1>客戶</h1>
+    <button type="button" class="bar-btn" id="cl-settings" aria-label="設定">設定</button>
+  </header>
+  <div class="search"><input id="cl-search" type="search" placeholder="搜尋名稱、代號、電話" autocomplete="off"></div>
+  <div class="page with-fab with-tabs" id="cl-list"></div>
+  <button type="button" class="fab above-tabs" id="cl-new">＋ 新增客戶</button>
+  <nav class="tabbar" aria-label="主選單">
+    <button type="button" data-tab="v-home"><span class="ti">▤</span>出貨單</button>
+    <button type="button" data-tab="v-clients" aria-current="page"><span class="ti">☺</span>客戶</button>
+  </nav>
 </section>
 
 <!-- 開單／編輯 -->
@@ -63,11 +82,14 @@
 <section class="view" id="v-newcust">
   <header class="bar">
     <button type="button" class="bar-back" data-back aria-label="返回">‹</button>
-    <h1>新增客戶</h1>
+    <h1 id="nc-title">新增客戶</h1>
   </header>
   <div class="page with-actions">
+    <div id="nc-banner"></div>
     <label class="field"><span>客戶名稱（印在單上）</span><input id="nc-name" autocomplete="off"></label>
-    <label class="field"><span>電話</span><input id="nc-phone" inputmode="tel" autocomplete="off"></label>
+    <div class="field"><span>電話</span>
+      <div class="inline"><input id="nc-phone" inputmode="tel" autocomplete="off"><a class="btn ghost call" id="nc-call" hidden>撥打</a></div>
+    </div>
     <label class="field"><span>地址</span><input id="nc-address" autocomplete="off"></label>
     <div class="field"><span>稅別</span>
       <div class="seg" id="nc-tax">
@@ -76,10 +98,11 @@
         <button type="button" data-v="none" aria-pressed="false">免稅</button>
       </div>
     </div>
+    <label class="field"><span>統一編號</span><input id="nc-taxid" inputmode="numeric" maxlength="8" autocomplete="off"></label>
     <label class="field"><span>備註</span><input id="nc-note" autocomplete="off"></label>
-    <p class="hint">新增的客戶會同步到電腦，在電腦上確認或合併。</p>
+    <p class="hint" id="nc-hint"></p>
   </div>
-  <div class="actions-bar"><button type="button" class="btn primary" id="nc-save">儲存並使用</button></div>
+  <div class="actions-bar"><button type="button" class="btn primary" id="nc-save">儲存</button></div>
 </section>
 
 <!-- 選品項 -->
@@ -157,7 +180,7 @@
     <button type="button" class="btn ghost block" id="st-test">列印測試單</button>
     <button type="button" class="btn ghost block" id="st-sync">立即同步</button>
     <button type="button" class="btn ghost block" id="st-repair">重新配對</button>
-    <button type="button" class="btn ghost danger block" id="st-reset">清除手持機上的資料</button>
+    <button type="button" class="btn ghost danger block" id="st-reset">清除手機上的資料</button>
     <p class="hint" id="st-version"></p>
   </div>
 </section>
