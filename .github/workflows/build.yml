@@ -29,14 +29,14 @@ jobs:
       - name: 編譯 APK
         env:
           APP_VERSION_CODE: ${{ github.run_number }}
-          APP_VERSION_NAME: "0.5.0"
+          APP_VERSION_NAME: "0.5.1"
         run: gradle -p handheld/android :app:assembleRelease --no-daemon --stacktrace
       - name: 整理檔名
-        run: cp handheld/android/app/build/outputs/apk/release/app-release.apk hongsheng-handheld-0.5.0.apk
+        run: cp handheld/android/app/build/outputs/apk/release/app-release.apk hongsheng-handheld-0.5.1.apk
       - uses: actions/upload-artifact@v4
         with:
           name: hongsheng-handheld-apk
-          path: hongsheng-handheld-0.5.0.apk
+          path: hongsheng-handheld-0.5.1.apk
 
   windows-exe:
     runs-on: windows-latest

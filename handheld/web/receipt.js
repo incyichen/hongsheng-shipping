@@ -1,13 +1,16 @@
-/* 熱感單（58mm 紙，384 點寬）：畫成圖片再送印表機，預覽看到的就是印出來的樣子。
+/* 熱感單：畫成圖片再送印表機，預覽看到的就是印出來的樣子。
+ * 寬度：80mm 紙 576 點、58mm 紙 384 點（203 dpi）。
  * 內容：公司、出貨單、單號、日期、客戶、品項（數量 × 單價 ＝ 金額）、依客戶稅別的稅金、總金額、簽收欄。
  */
 (function (root) {
   'use strict';
-  const W = 384;          // 58mm 熱感紙的列印寬度（點）
-  const PAD = 6;
+  const WIDTHS = { '80': 576, '58': 384 };
+  let W = 576;
+  let PAD = 8;
+  let K = 1.3; // 字體放大倍數（80mm 紙字大一點）
   const FONT = '"Noto Sans CJK TC", "Noto Sans TC", "Droid Sans Fallback", sans-serif';
 
-  function font(size, bold) { return `${bold ? 'bold ' : ''}${size}px ${FONT}`; }
+  function font(size, bold) { return `${bold ? 'bold ' : ''}${Math.round(size * K)}px ${FONT}`; }
 
   // 依寬度斷行（中文逐字、英數不切開單字太長時也照樣切）
   function wrap(ctx, text, maxW) {
@@ -65,20 +68,23 @@
   function render(doc, opt = {}) {
     const canvas = document.getElementById('receipt-canvas') || document.createElement('canvas');
     const ctx = canvas.getContext('2d');
+    W = WIDTHS[opt.paper] || WIDTHS['80'];
+    K = W >= 576 ? 1.3 : 1;
+    PAD = W >= 576 ? 8 : 6;
     const items = build(doc, opt);
     // 第一次：量高度
     const lines = [];
     let y = PAD;
     for (const it of items) {
-      if (it.kind === 'gap') { y += it.h; continue; }
+      if (it.kind === 'gap') { y += Math.round(it.h * K); continue; }
       if (it.kind === 'rule' || it.kind === 'sign') { lines.push({ ...it, y: y + 8 }); y += 18; continue; }
       ctx.font = font(it.size, it.bold);
-      const lh = Math.round(it.size * 1.35);
+      const lh = Math.round(it.size * K * 1.35);
       if (it.kind === 'text') {
-        for (const part of wrap(ctx, it.t, W - PAD * 2 - it.indent)) { lines.push({ ...it, t: part, y }); y += lh; }
+        for (const part of wrap(ctx, it.t, W - PAD * 2 - it.indent * K)) { lines.push({ ...it, t: part, y }); y += lh; }
       } else {
         const rw = ctx.measureText(it.r).width;
-        const leftParts = wrap(ctx, it.l, W - PAD * 2 - it.indent - rw - 14);
+        const leftParts = wrap(ctx, it.l, W - PAD * 2 - it.indent * K - rw - 14);
         leftParts.forEach((part, i) => {
           lines.push({ kind: 'lr', l: part, r: i === leftParts.length - 1 ? it.r : '', size: it.size, bold: it.bold, indent: it.indent, y });
           y += lh;
@@ -103,15 +109,15 @@
       }
       if (ln.kind === 'sign') {
         ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.moveTo(PAD + 70, ln.y); ctx.lineTo(W - PAD, ln.y); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(PAD + Math.round(70 * K), ln.y); ctx.lineTo(W - PAD, ln.y); ctx.stroke();
         continue;
       }
       ctx.font = font(ln.size, ln.bold);
       if (ln.kind === 'text') {
-        const x = ln.align === 'center' ? (W - ctx.measureText(ln.t).width) / 2 : PAD + ln.indent;
+        const x = ln.align === 'center' ? (W - ctx.measureText(ln.t).width) / 2 : PAD + ln.indent * K;
         ctx.fillText(ln.t, x, ln.y);
       } else {
-        ctx.fillText(ln.l, PAD + ln.indent, ln.y);
+        ctx.fillText(ln.l, PAD + ln.indent * K, ln.y);
         if (ln.r) ctx.fillText(ln.r, W - PAD - ctx.measureText(ln.r).width, ln.y);
       }
     }
@@ -119,5 +125,5 @@
     return { dataUrl, base64: dataUrl.split(',')[1], height };
   }
 
-  root.Receipt = { render, WIDTH: W };
+  root.Receipt = { render, WIDTHS };
 })(window);

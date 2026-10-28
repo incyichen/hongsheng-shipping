@@ -73,7 +73,7 @@
   function emptyState() {
     return {
       version: 1,
-      config: { server: '', token: '', prefix: '', deviceName: '', companyName: '泓昇海鮮', maker: '', printer: 'auto' },
+      config: { server: '', token: '', prefix: '', deviceName: '', companyName: '泓昇海鮮', maker: '', printer: 'auto', paper: '80', printLang: 'escpos' },
       since: 0,
       customers: {},        // uid → WireCustomer（含手機新增、尚未上傳的）
       products: {},         // uid → WireProduct

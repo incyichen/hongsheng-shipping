@@ -26,7 +26,8 @@
     loadState: () => N.loadState(),
     saveState: (json) => { const r = N.saveState(json); if (r !== 'ok') throw new Error(r); },
     http: (method, url, headers, body) => callAsync((id) => N.request(id, method, url, JSON.stringify(headers || {}), body || '')),
-    print: (pngBase64, printer) => callAsync((id) => N.print(id, pngBase64, printer || 'auto')),
+    // opts：{ printer: 'auto' | 'bt:位址', lang: 'escpos' | 'cpcl' }
+    print: (pngBase64, opts) => callAsync((id) => N.print(id, pngBase64, JSON.stringify(opts || {}))),
     printerInfo: () => { try { return JSON.parse(N.printerInfo()); } catch (e) { return { sunmi: false, bluetooth: [], error: String(e) }; } },
     deviceName: () => N.deviceName(),
     appVersion: () => (N.appVersion ? N.appVersion() : ''),
@@ -39,7 +40,7 @@
       const r = await fetch(url, { method, headers, body: method === 'GET' ? undefined : body });
       return { status: r.status, body: await r.text() };
     },
-    print: async (pngBase64) => { root.__lastPrint = pngBase64; return { status: 0, body: '（瀏覽器測試：未實際列印）' }; },
+    print: async (pngBase64, opts) => { root.__lastPrint = pngBase64; root.__lastPrintOpts = opts; return { status: 0, body: '（瀏覽器測試：未實際列印）' }; },
     printerInfo: () => ({ sunmi: false, bluetooth: [{ name: 'InnerPrinter', address: '00:11:22:33:44:55' }], error: '' }),
     deviceName: () => 'SUNMI V3',
     appVersion: () => 'web',

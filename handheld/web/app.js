@@ -309,14 +309,14 @@
   enter['v-receipt'] = () => {};
   leave['v-receipt'] = () => { home(); return false; };
   async function printNow() {
-    const img = window.Receipt.render(rc.doc, { company: S.config.companyName, reprint: rc.reprint });
+    const img = window.Receipt.render(rc.doc, { company: S.config.companyName, reprint: rc.reprint, paper: S.config.paper });
     $('rc-image').src = img.dataUrl;
     const st = $('rc-status');
     st.className = 'status-line';
     st.textContent = '列印中…';
     $('rc-print').disabled = true;
     try {
-      await NB.print(img.base64, S.config.printer);
+      await NB.print(img.base64, { printer: S.config.printer, lang: S.config.printLang });
       st.className = 'status-line ok';
       st.textContent = rc.reprint ? '已補印' : `${rc.doc.doc_no} 已列印，記為已出貨`;
       if (rc.uid && S.docs[rc.uid] && !S.docs[rc.uid].doc.shipped_at) {
@@ -596,9 +596,15 @@
     const opts = [{ v: 'auto', t: info.sunmi ? '內建印表機（已連線）' : '自動（使用已配對的藍牙印表機）' }]
       .concat((info.bluetooth || []).map((b) => ({ v: 'bt:' + b.address, t: `藍牙：${b.name}` })));
     $('st-printers').innerHTML = opts.map((o) => `<button type="button" class="opt" data-v="${esc(o.v)}" aria-pressed="${c.printer === o.v}">${esc(o.t)}</button>`).join('')
-      + `<p class="hint">${info.bluetooth && info.bluetooth.length ? '配對了好幾台藍牙裝置時，請直接選印表機（例如 ZR128）。' : '找不到已配對的藍牙裝置：請先到手機的「設定 → 藍牙」配對印表機。'}</p>`
+      + `<p class="hint">${info.bluetooth && info.bluetooth.length ? '配對了好幾台藍牙裝置時，請直接選印表機（例如 ZR328）。' : '找不到已配對的藍牙裝置：請先到手機的「設定 → 藍牙」配對印表機。'}</p>`
       + (info.error ? `<p class="hint" style="color:var(--danger)">${esc(info.error)}</p>` : '');
     $('st-printers').querySelectorAll('.opt').forEach((b) => { b.onclick = () => { S.config.printer = b.dataset.v; persist(); renderSettings(); }; });
+    const seg = (id, key, val) => $(id).querySelectorAll('button').forEach((b) => {
+      b.setAttribute('aria-pressed', String(b.dataset.v === val));
+      b.onclick = () => { S.config[key] = b.dataset.v; persist(); renderSettings(); };
+    });
+    seg('st-paper', 'paper', c.paper || '80');
+    seg('st-lang', 'printLang', c.printLang || 'escpos');
     const v = NB.appVersion();
     $('st-version').textContent = `App 版本 ${v || '—'}`;
   }

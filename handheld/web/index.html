@@ -177,6 +177,13 @@
     <div class="card" id="st-conn"></div>
     <label class="field"><span>製表人員（預設）</span><input id="st-maker" autocomplete="off"></label>
     <div class="field"><span>印表機</span><div id="st-printers" class="stack"></div></div>
+    <div class="field"><span>紙張寬度</span>
+      <div class="seg two" id="st-paper"><button type="button" data-v="80">80mm</button><button type="button" data-v="58">58mm</button></div>
+    </div>
+    <div class="field"><span>印表機指令</span>
+      <div class="seg two" id="st-lang"><button type="button" data-v="escpos">ESC/POS</button><button type="button" data-v="cpcl">CPCL（斑馬）</button></div>
+      <p class="hint">先用 ESC/POS 列印測試單；如果印出亂碼或一堆符號，改選 CPCL 再試一次。</p>
+    </div>
     <button type="button" class="btn ghost block" id="st-test">列印測試單</button>
     <button type="button" class="btn ghost block" id="st-sync">立即同步</button>
     <button type="button" class="btn ghost block" id="st-repair">重新配對</button>
