@@ -1166,10 +1166,10 @@ $('#btn-new-man').addEventListener('click', () => newManual());
 async function newManual() {
   if (!(await showView('man-edit'))) return;
   const preset = findCustomer($('#man-f-cust').value);
-  // 預設對帳月份：每月 10 號以前是上個月，之後是這個月；單據日期為該月最後一天
+  // 預設對帳月份：每月 10 號以前是上個月，之後是這個月；單據日期為建立當天
   const period = $('#man-f-month').value || prevMonth();
   M.doc = {
-    id: null, stmt_no: '', customer_id: preset ? preset.id : null, period, doc_date: monthRange(period)[1],
+    id: null, stmt_no: '', customer_id: preset ? preset.id : null, period, doc_date: today(),
     maker: S.settings.default_maker || '', note: '', status: 'draft', layout: S.settings.manual_layout || 'double',
     cust_name: '', cust_phone: '', cust_address: '', tax_mode: preset ? preset.tax_mode : 'exclusive',
     subtotal: 0, tax: 0, total: 0, lines: [blankManLine()],
@@ -1371,9 +1371,7 @@ function bindManEditor() {
   };
   $('#mn-period').onchange = (e) => {
     if (!e.target.value) return;
-    M.doc.period = e.target.value;
-    M.doc.doc_date = monthRange(M.doc.period)[1];
-    $('#mn-date').value = M.doc.doc_date;
+    M.doc.period = e.target.value; // 單據日期不跟著改（預設是建立當天）
     $('#mn-title').textContent = `標題：${periodTitle(M.doc.period)}`;
     M.dirty = true;
     M.doc.lines.forEach((_, i) => updateManRow(i));
