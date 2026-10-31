@@ -47,10 +47,11 @@
     <div class="head">
       <h1>對帳單（手開）</h1>
       <div class="actions">
+        <button type="button" class="btn" id="btn-man-batch" disabled>列印勾選的</button>
         <button type="button" class="btn primary" id="btn-new-man">＋ 新增對帳單</button>
       </div>
     </div>
-    <p class="hint">只輸入日期和金額的對帳單，獨立作業，不連品項，也不算進客戶的未收金額。</p>
+    <p class="hint">只輸入日期和金額的對帳單，獨立作業，不連品項，也不算進客戶的未收金額。勾選多張可以一次列印，每張都從新的一張中一刀開始。</p>
     <div class="card pad">
       <div class="fields">
         <label class="f span2"><span class="lbl">客戶（空白＝全部）</span><input type="text" id="man-f-cust" data-combo="customers" autocomplete="off" placeholder="輸入名稱或代號"></label>
@@ -87,7 +88,12 @@
       <div class="grow stack">
         <div class="card" id="st-preview"><div class="empty">選擇客戶和月份，就會列出這段期間的出貨單。</div></div>
         <div class="card">
-          <div style="padding: 16px 20px 0"><h2>已建立的對帳單</h2></div>
+          <div style="padding: 16px 20px 0;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <h2 style="margin:0;flex:1">已建立的對帳單</h2>
+            <label class="check" style="gap:6px">期間結束月份 <input type="month" id="stl-month" aria-label="篩選月份"></label>
+            <button type="button" class="btn" id="btn-st-batch" disabled>列印勾選的</button>
+          </div>
+          <p class="hint" style="padding: 6px 20px 0">勾選多張可以一次列印，每張都從新的一張中一刀開始。</p>
           <div class="table-wrap" id="st-list"></div>
         </div>
       </div>
@@ -233,7 +239,7 @@
               </select></label>
             <label class="check span4"><input type="checkbox" id="s-continuous">連續報表（第二張起直接接著印明細，不重印欄位名稱、不印頁碼）</label>
             <label class="f"><span class="lbl">驅動程式紙張寬（公分）</span><input type="number" id="s-pw" step="0.01" min="5" max="40"></label>
-            <label class="f"><span class="lbl">驅動程式紙張長（公分）</span><input type="number" id="s-ph" step="0.01" min="5" max="40"></label>
+            <label class="f"><span class="lbl">驅動程式紙張長（公分）</span><input type="number" id="s-ph" step="0.01" min="5" max="40"><span class="info-line">中一刀實際是 5.5 吋＝13.97 公分；要跟驅動程式的自訂紙張一致</span></label>
           </div>
           <p class="hint" style="margin-top: 12px">9½×11 吋紙、行距 30（1/6 吋）時每頁 66 行，半張（中一刀）33 行。每頁行數請設成偶數，半張才會剛好停在撕線。驅動程式模式下，紙張寬、長要和 LQ-310「自訂紙張」裡中一刀的尺寸一樣（目前 21 × 14 公分）。先印對位測試頁，對照實際撕線位置再調整數字。</p>
           <div class="actions" style="margin-top: 12px">

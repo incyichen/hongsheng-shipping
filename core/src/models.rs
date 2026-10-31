@@ -284,7 +284,7 @@ impl Default for PrintConfig {
             chinese_cmd: true,
             paper_mode: "half".into(),
             driver_paper_w_cm: 21.0,
-            driver_paper_h_cm: 14.0,
+            driver_paper_h_cm: 13.97, // 中一刀：5.5 吋
             continuous: true,
         }
     }

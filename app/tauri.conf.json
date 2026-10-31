@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "HongshengShipping",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "identifier": "tw.hongsheng.shipping",
   "build": {
     "frontendDist": "../ui"

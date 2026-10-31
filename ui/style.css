@@ -218,3 +218,7 @@ table.lines .c-del { width: 44px; }
   #print-root .paper:last-child { page-break-after: auto; break-after: auto; }
   #print-root .paper .strip { display: none; }
 }
+
+/* 清單勾選欄 */
+.grid th.chk, .grid td.chk { width: 36px; text-align: center; padding-left: 10px; padding-right: 0; }
+.grid td.chk input, .grid th.chk input { width: 17px; height: 17px; cursor: pointer; }

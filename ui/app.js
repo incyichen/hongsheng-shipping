@@ -1089,7 +1089,7 @@ $('#preview-print').onclick = async () => {
 function driverPaper(r) {
   const c = r.config;
   const w = Number(c.driver_paper_w_cm) || 21;
-  const h = Number(c.driver_paper_h_cm) || 14;
+  const h = Number(c.driver_paper_h_cm) || 13.97;
   return { w, h: r.half ? h : h * 2 };
 }
 
@@ -1106,6 +1106,52 @@ function driverPrint(r) {
     window.addEventListener('afterprint', done);
     setTimeout(() => window.print(), 50);
   });
+}
+
+// 一次列印多張：每張從新的一頁（新的一張中一刀）開始，撕開時不會被截斷
+// items：[{ id, label }]；render／print 是單張的指令名稱；afterEach(id) 印完後要做的事
+async function batchPrint(items, { render, print, title, afterEach }) {
+  if (!items.length) return;
+  if (S.settings.print.mode === 'escp') {
+    if (!(await confirmBox(`列印 ${items.length} 張？`, '列印'))) return;
+    for (const it of items) {
+      await call(print, { id: it.id });
+      if (afterEach) await afterEach(it.id);
+    }
+    toast(`已送出 ${items.length} 張到印表機`);
+    return;
+  }
+  const rs = [];
+  for (const it of items) rs.push(await call(render, { id: it.id }));
+  if (rs.some((r) => r.half !== rs[0].half || (r.page_lines || 0) !== (rs[0].page_lines || 0))) {
+    toast('這幾張的紙張大小不同（有中一刀也有整張），請到「設定」把紙張固定為中一刀或整張再印', 'error');
+    return;
+  }
+  const all = { ...rs[0], pages: rs.flatMap((r) => r.pages) };
+  openPreview(all, `${title}：${items.length} 張`, async () => {
+    await driverPrint(all);
+    if (afterEach) for (const it of items) await afterEach(it.id);
+    toast(`已列印 ${items.length} 張`);
+  });
+}
+
+// 清單的勾選：sel 是 Set；全選只選目前清單上看得到的
+function bindChecks(box, sel, onChange) {
+  box.querySelectorAll('input[data-chk]').forEach((cb) => {
+    cb.checked = sel.has(Number(cb.dataset.chk));
+    cb.onclick = (e) => { e.stopPropagation(); if (cb.checked) sel.add(Number(cb.dataset.chk)); else sel.delete(Number(cb.dataset.chk)); onChange(); };
+  });
+  const all = box.querySelector('input[data-chkall]');
+  if (all) {
+    const ids = [...box.querySelectorAll('input[data-chk]')].map((cb) => Number(cb.dataset.chk));
+    all.checked = ids.length > 0 && ids.every((i) => sel.has(i));
+    all.onclick = (e) => { e.stopPropagation(); ids.forEach((i) => (all.checked ? sel.add(i) : sel.delete(i))); onChange(); };
+  }
+  // 點勾選框那一格不要開啟單據
+  box.querySelectorAll('td.chk').forEach((td) => td.addEventListener('click', (e) => {
+    if (e.target === td) { const cb = td.querySelector('input'); cb.click(); }
+    e.stopPropagation();
+  }));
 }
 
 // ============================================================
@@ -1137,24 +1183,46 @@ function parseManDate(text, period) {
 
 function blankManLine() { return { id: null, line_date: '', amount: null, note: '', _text: '' }; }
 
+const manSel = new Set();
+let manListCache = [];
+function updateManBatch() {
+  const n = [...manSel].filter((id) => manListCache.some((m) => m.id === id)).length;
+  $('#btn-man-batch').disabled = !n;
+  $('#btn-man-batch').textContent = n ? `列印勾選的（${n} 張）` : '列印勾選的';
+}
 async function renderManList() {
   if (!$('#man-f-month').dataset.init) { $('#man-f-month').dataset.init = '1'; }
   const cust = findCustomer($('#man-f-cust').value);
   const period = $('#man-f-month').value || null;
   const list = await call('list_manual', { customerId: cust ? cust.id : null, period, limit: 500 });
+  manListCache = list;
+  for (const id of [...manSel]) if (!list.some((m) => m.id === id)) manSel.delete(id);
   const box = $('#man-list');
   if (!list.length) {
     box.innerHTML = '<div class="empty">還沒有手開對帳單。按右上角「新增對帳單」開始。</div>';
+    updateManBatch();
     return;
   }
   box.innerHTML = `<table class="grid"><thead><tr>
+      <th class="chk"><input type="checkbox" data-chkall aria-label="全選"></th>
       <th>對帳月份</th><th>單號</th><th>客戶</th><th class="num">筆數</th><th class="num">合計</th><th>狀態</th></tr></thead><tbody>
     ${list.map((m) => `<tr class="click" data-id="${m.id}">
+      <td class="chk"><input type="checkbox" data-chk="${m.id}" aria-label="勾選 ${esc(m.stmt_no)}"></td>
       <td>${esc(periodLabel(m.period))}</td><td>${esc(m.stmt_no)}</td><td>${esc(m.cust_name)}</td>
       <td class="num">${m.line_count}</td><td class="num">${fmtInt(m.total)}</td>
       <td>${m.status === 'draft' ? '<span class="badge draft">草稿</span>' : '<span class="badge">已開立</span>'}</td>
     </tr>`).join('')}</tbody></table>`;
+  bindChecks(box, manSel, updateManBatch);
+  updateManBatch();
 }
+$('#btn-man-batch').addEventListener('click', async () => {
+  // 依清單上的順序列印
+  const items = manListCache.filter((m) => manSel.has(m.id)).map((m) => ({ id: m.id }));
+  await batchPrint(items, { render: 'render_manual', print: 'print_manual', title: '手開對帳單',
+    afterEach: (id) => (S.settings.print.mode === 'escp' ? null : call('mark_manual_issued', { id })) });
+  manSel.clear();
+  renderManList();
+});
 $('#man-list').addEventListener('click', (e) => {
   const tr = e.target.closest('tr[data-id]');
   if (tr) openManual(Number(tr.dataset.id));
@@ -1590,18 +1658,38 @@ async function printStatement(id) {
   }
 }
 
+const stSel = new Set();
+let stListCache = [];
+function updateStBatch() {
+  const n = [...stSel].filter((id) => stListCache.some((x) => x.id === id)).length;
+  $('#btn-st-batch').disabled = !n;
+  $('#btn-st-batch').textContent = n ? `列印勾選的（${n} 張）` : '列印勾選的';
+}
 async function renderStatementList() {
   const c = stCustomer();
-  const list = await call('list_statements', { customerId: c ? c.id : null });
+  const month = $('#stl-month').value;
+  const list = (await call('list_statements', { customerId: c ? c.id : null }))
+    .filter((x) => !month || x.period_end.slice(0, 7) === month);
+  stListCache = list;
+  for (const id of [...stSel]) if (!list.some((x) => x.id === id)) stSel.delete(id);
   const box = $('#st-list');
-  if (!list.length) { box.innerHTML = '<div class="empty">還沒有對帳單。</div>'; return; }
-  box.innerHTML = `<table class="grid"><thead><tr><th>單號</th><th>客戶</th><th>期間</th><th class="num">本期金額</th><th class="num">應收</th><th></th></tr></thead><tbody>
-    ${list.map((s) => `<tr><td>${esc(s.stmt_no)}</td><td>${esc(s.cust_name)}</td><td>${esc(slashDate(s.period_start))}–${esc(slashDate(s.period_end).slice(5))}</td>
+  if (!list.length) { box.innerHTML = `<div class="empty">${month ? '這個月份沒有對帳單。' : '還沒有對帳單。'}</div>`; updateStBatch(); return; }
+  box.innerHTML = `<table class="grid"><thead><tr><th class="chk"><input type="checkbox" data-chkall aria-label="全選"></th><th>單號</th><th>客戶</th><th>期間</th><th class="num">本期金額</th><th class="num">應收</th><th></th></tr></thead><tbody>
+    ${list.map((s) => `<tr><td class="chk"><input type="checkbox" data-chk="${s.id}" aria-label="勾選 ${esc(s.stmt_no)}"></td><td>${esc(s.stmt_no)}</td><td>${esc(s.cust_name)}</td><td>${esc(slashDate(s.period_start))}–${esc(slashDate(s.period_end).slice(5))}</td>
       <td class="num">${fmtInt(s.period_amount)}</td><td class="num">${fmtInt(s.total_due)}</td>
       <td style="white-space:nowrap"><button type="button" class="btn link" data-sv="${s.id}" data-no="${esc(s.stmt_no)}">預覽／列印</button>
         <button type="button" class="btn link" data-void="${s.id}" data-no="${esc(s.stmt_no)}" style="color:var(--danger)">作廢</button></td></tr>`).join('')}
   </tbody></table>`;
+  bindChecks(box, stSel, updateStBatch);
+  updateStBatch();
 }
+$('#stl-month').addEventListener('change', () => renderStatementList());
+$('#btn-st-batch').addEventListener('click', async () => {
+  const items = stListCache.filter((x) => stSel.has(x.id)).map((x) => ({ id: x.id }));
+  await batchPrint(items, { render: 'render_statement', print: 'print_statement', title: '對帳單' });
+  stSel.clear();
+  renderStatementList();
+});
 
 $('#st-list').addEventListener('click', async (e) => {
   const v = e.target.closest('[data-sv]');
